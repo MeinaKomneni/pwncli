@@ -136,3 +136,7 @@ test/
 .gdb_history
 core
 .vscode
+
+# agent
+.claude
+CLAUDE.md
