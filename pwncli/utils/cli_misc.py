@@ -60,6 +60,7 @@ __all__ = [
     "set_remote_libc",
     "copy_current_io",
     # abbr for io.send/recb functions
+    "switch_io",
     "s", "sl", "sa", "sla", "st", "slt", "ru", "rl", "rs",
     "rls", "rlc", "rle", "ra", "rr", "r", "rn", "ia", "ic", "cr",
     # play with gadgets
@@ -573,6 +574,11 @@ def call_current_CDLL_func(func_name: str, *func_args):
     return call_CDLL_func(gift.libc.path if gift.libc  else None, func_name, *func_args)
 
 # -----------------------------io------------------------
+
+
+def switch_io(io):
+    """Switch gift['io'] to another tube, so all shorthand functions (sla, ru, etc.) operate on it."""
+    gift['io'] = io
 
 
 def s(*args, **kwargs):

@@ -16,7 +16,7 @@ import click
 from .utils.config import read_ini, try_get_config_data_by_key
 from .utils.misc import errlog_ex, log2_ex, log_ex, gift
 
-__all__ = ['cli_script']
+__all__ = ['cli_script', 'set_gdb_script']
 
 
 _CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -202,8 +202,26 @@ def cli(ctx, filename, verbose, extra_argv): # ctx: command property
     ctx.gift.extra_argv = extra_argv
     
 
+def set_gdb_script(script: str):
+    """Inject a gdb script into sys.argv so the debug command picks it up.
+
+    Call this BEFORE cli_script(). Lines are joined with ';' as the debug
+    command expects.
+    """
+    merged = ";".join(line for line in script.strip().splitlines() if line.strip())
+    for i, arg in enumerate(sys.argv):
+        if arg in ('-s', '-gs', '--gdb-script'):
+            sys.argv[i + 1] = merged
+            return
+    sys.argv.extend(['-s', merged])
+
+
 def cli_script():
-    cli.main(standalone_mode=False)
+    try:
+        cli.main(standalone_mode=False)
+    except click.exceptions.UsageError:
+        cli.main(['--help'], standalone_mode=False)
+        sys.exit(0)
 
 
 
