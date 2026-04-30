@@ -106,6 +106,13 @@ class _GadgetBase:
     def get_pop_rdx_rbx_ret(self, name: str = None) -> int:
         return self.search_opcode("5a5bc3", name)
 
+    def get_pop_rdx_xor_eax_ret(self, name: str = None) -> int:
+        return self.search_opcode("5a31c0c3", name)
+
+    def get_pop_rdx_xor_eax_pop4_ret(self, name: str = None) -> int:
+        """pop rdx; xor eax, eax; pop rbx; pop r12; pop r13; pop rbp; ret"""
+        return self.search_opcode("5a31c05b415c415d5dc3", name)
+
     def get_pop_rax_ret(self, name: str = None) -> int:
         return self.search_opcode("58c3", name)
 

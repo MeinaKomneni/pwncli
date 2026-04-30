@@ -939,6 +939,16 @@ class CurrentGadgets:
         return CurrentGadgets._internal_find('get_pop_rdx_rbx_ret')
 
     @staticmethod
+    def pop_rdx_xor_eax_ret() -> int:
+        """pop rdx; xor eax, eax; ret"""
+        return CurrentGadgets._internal_find('get_pop_rdx_xor_eax_ret')
+
+    @staticmethod
+    def pop_rdx_xor_eax_pop4_ret() -> int:
+        """pop rdx; xor eax, eax; pop rbx; pop r12; pop r13; pop rbp; ret"""
+        return CurrentGadgets._internal_find('get_pop_rdx_xor_eax_pop4_ret')
+
+    @staticmethod
     def pop_rax_ret() -> int:
         """pop rax; ret"""
         return CurrentGadgets._internal_find('get_pop_rax_ret')
@@ -1210,9 +1220,9 @@ class CurrentGadgets:
             pass
         # mov qword ptr [rax], rdx; ret;
         layout = [
+            CurrentGadgets.__try_get_rdx_gadget(number),
             CurrentGadgets.pop_rax_ret(),
             addr,
-            CurrentGadgets.__try_get_rdx_gadget(number),
             CurrentGadgets.find_gadget('488910C3', 'opcode')
         ]
         return flat(layout)
@@ -1250,7 +1260,16 @@ class CurrentGadgets:
         try:
             return [CurrentGadgets.pop_rdx_ret(), rdx_val]
         except:
+            pass
+        try:
             return [CurrentGadgets.pop_rdx_rbx_ret(), rdx_val, rbx_val]
+        except:
+            pass
+        try:
+            return [CurrentGadgets.pop_rdx_xor_eax_ret(), rdx_val]
+        except:
+            pass
+        return [CurrentGadgets.pop_rdx_xor_eax_pop4_ret(), rdx_val, 0, 0, 0, 0]
 
     @staticmethod
     def __try_get_rcx_gadget(rcx_val, rbx_val=0) -> list:
