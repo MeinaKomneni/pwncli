@@ -24,6 +24,56 @@ Consts.show()
 
 ***
 
+## CTF 常用组合速查
+
+闭网打比赛时最常用的几个组合，直接抄：
+
+```python
+# ========== mmap: 开一块 RWX 内存写 shellcode ==========
+# mmap(0, 0x1000, 7, 0x22, -1, 0)
+#   prot  = PROT_READ|PROT_WRITE|PROT_EXEC = 7
+#   flags = MAP_PRIVATE|MAP_ANONYMOUS       = 0x22
+#   fd    = -1 (匿名映射不需要文件)
+mmap(0, 0x1000, 7, 0x22, -1, 0)
+
+# ========== mmap: 映射到固定地址 ==========
+# mmap(0xdead0000, 0x1000, 7, 0x32, -1, 0)
+#   flags = MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED = 0x32
+mmap(0xdead0000, 0x1000, 7, 0x32, -1, 0)
+
+# ========== mprotect: 把某段改成可执行 ==========
+# mprotect(page_addr, 0x1000, 7)
+#   addr 必须页对齐 (addr & 0xfff == 0)
+mprotect(buf_addr & ~0xfff, 0x1000, 7)
+
+# ========== open + read + write: ORW 读 flag ==========
+# fd = open("/flag", 0, 0)       O_RDONLY = 0
+# read(fd, buf, 0x100)
+# write(1, buf, 0x100)           stdout = 1
+
+# ========== openat: 当 open 被 seccomp 禁了 ==========
+# openat(-100, "/flag", 0, 0)    AT_FDCWD = -100 = 0xffffff9c
+
+# ========== socket + connect: 反弹 shell ==========
+# socket(2, 1, 0)                AF_INET=2, SOCK_STREAM=1
+```
+
+### 纯数字速记卡
+
+打 ROP 时经常要手填立即数，下面是最高频的几个：
+
+| 场景 | 参数 | 值 |
+|------|------|----|
+| mmap RWX 匿名 | prot=7, flags=0x22, fd=-1 | `7, 0x22, -1` |
+| mmap RWX 固定地址 | prot=7, flags=0x32, fd=-1 | `7, 0x32, -1` |
+| mprotect RWX | prot=7 | `7` |
+| open 只读 | flags=0 | `0` |
+| openat 当前目录 | dirfd=-100 | `-100` (0xffffff9c) |
+| socket TCP | domain=2, type=1, proto=0 | `2, 1, 0` |
+| execve | "/bin/sh"=0x68732f6e69622f | — |
+
+***
+
 ## 包含的常量组
 
 ### mmap
