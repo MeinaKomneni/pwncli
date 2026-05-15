@@ -2,6 +2,7 @@ from .bruteforce import *
 from .cli_decorates import *
 from .cli_misc import *
 from .config import *
+from .consts import *
 from .decorates import *
 from .exceptions import *
 from .gadgetbox import *
@@ -13,7 +14,7 @@ from .pipes import *
 from .shellcode import *
 from .syscall_num import *
 
-from . import (bruteforce, cli_decorates, cli_misc, config, decorates,
+from . import (bruteforce, cli_decorates, cli_misc, config, consts, decorates,
                exceptions, gadgetbox, gdb_helper, io_file, libcbox,
                misc, pipes, shellcode, syscall_num)
 
@@ -22,6 +23,7 @@ __all__ += bruteforce.__all__
 __all__ += cli_decorates.__all__
 __all__ += cli_misc.__all__
 __all__ += config.__all__
+__all__ += consts.__all__
 __all__ += decorates.__all__
 __all__ += exceptions.__all__
 __all__ += gadgetbox.__all__
