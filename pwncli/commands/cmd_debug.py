@@ -17,7 +17,7 @@ import threading
 import click
 from pwn import ELF, context, pause, sleep, which
 from pwnlib.atexit import register
-from pwnlib.gdb import attach
+from pwnlib.gdb import attach, debug as gdb_debug
 from pwnlib.util.safeeval import expr
 
 from ..cli import _set_filename, pass_environ
@@ -203,7 +203,7 @@ def _set_terminal(ctx, p, flag, attach_mode, use_gdb, gdb_type, script, is_file,
 
 
 def _check_set_value(ctx, filename, argv, env, use_tmux, use_wsl, use_gnome, attach_mode,
-                     use_gdb, gdb_type, gdb_breakpoint, gdb_script, pause_before_main, hook_file, hook_function, gdb_tbreakpoint):
+                     use_gdb, gdb_type, gdb_breakpoint, gdb_script, pause_before_main, hook_file, hook_function, gdb_tbreakpoint, gdb_method='attach'):
     # set filename
     if not ctx.gift.filename:
         _set_filename(
@@ -428,13 +428,22 @@ int %s()
                 msg="debug-command 'pause_before_main' --> Cannot find gcc in PATH.")
 
     # set binary
-    ctx.gift['io'] = context.binary.process(
-        argv, timeout=ctx.gift['context_timeout'], env=env)
-    sleep(0.1)
-    if ctx.gift['io'].poll():
-        ctx.abort(msg="debug-command --> Process [{}] is not alive now.".format(ctx.gift['io'].proc.pid))
+    if gdb_method == 'debug':
+        ctx.vlog("debug-command --> Using gdb.debug() mode (gdb starts the process)")
+    else:
+        ctx.vlog("debug-command --> Using gdb.attach() mode (attach to running process)")
+
+    if gdb_method == 'attach':
+        ctx.gift['io'] = context.binary.process(
+            argv, timeout=ctx.gift['context_timeout'], env=env)
+        sleep(0.1)
+        if ctx.gift['io'].poll():
+            ctx.abort(msg="debug-command --> Process [{}] is not alive now.".format(ctx.gift['io'].proc.pid))
     
-    ctx.gift['_elf_base'] = ctx.gift.elf.address or get_current_codebase_addr()
+    if gdb_method == 'attach':
+        ctx.gift['_elf_base'] = ctx.gift.elf.address or get_current_codebase_addr()
+    else:
+        ctx.gift['_elf_base'] = ctx.gift.elf.address
     ctx.gift['process_args'] = argv.copy().insert(0, filename)
     if env:
         ctx.gift['process_env'] = env.copy()
@@ -453,11 +462,17 @@ int %s()
         if rp:
             ctx.gift['libc'] = ELF(rp, checksec=False)
             ctx.gift['libc'].address = 0
-            ctx.gift['_libc_base'] = get_current_libcbase_addr()
+            if gdb_method == 'attach':
+                ctx.gift['_libc_base'] = get_current_libcbase_addr()
+            else:
+                ctx.gift['_libc_base'] = 0
         else:
-            ctx.gift['libc'] = ctx.gift['io'].libc
-            ctx.gift['_libc_base'] = ctx.gift['libc'].address
-            ctx.gift['libc'].address = 0
+            if gdb_method == 'attach':
+                ctx.gift['libc'] = ctx.gift['io'].libc
+                ctx.gift['_libc_base'] = ctx.gift['libc'].address
+                ctx.gift['libc'].address = 0
+            else:
+                ctx.gift['_libc_base'] = 0
             ctx.vlog2('debug-command --> ldd cannot find the libc.so.6 or libc-2.xx.so, and rename your libc file to "libc.so.6" if you add it to LD_PRELOAD')
 
     ctx.vlog(
@@ -559,9 +574,38 @@ int %s()
         else:
             attach_mode = 'wsl-b'  # don't know whether bash.exe is correct
 
-    # set terminal
-    _set_terminal(ctx, ctx.gift['io'], t_flag, attach_mode,
-                  use_gdb, gdb_type, script, is_file, gdb_script)
+    if gdb_method == 'debug':
+        # gdb.debug() mode: gdb starts the process and stops at entry point
+        terminal = None
+        if t_flag & _USE_TMUX:
+            terminal = ['tmux', 'splitw', '-h']
+        elif t_flag & _USE_GNOME_TERMINAL:
+            terminal = ["gnome-terminal", "--", "sh", "-c"]
+        elif use_gdb:
+            if _in_tmux():
+                terminal = ["tmux", "splitw", "-h"]
+            elif which("gnome-terminal"):
+                terminal = ["gnome-terminal", "--", "sh", "-c"]
+
+        if terminal:
+            context.terminal = terminal
+
+        gdb_type_res = None
+        try:
+            gdb_type_res = _set_gdb_type(ctx.pwncli_path, gdb_type)
+            gdb_args = [filename] + argv if argv else [filename]
+            ctx.gift['io'] = gdb_debug(gdb_args, gdbscript=script, env=env, api=True)
+            if isinstance(ctx.gift['io'], tuple):
+                ctx.gift['io'], ctx.gift['gdb_obj'] = ctx.gift['io']
+        except Exception as e:
+            ctx.verrlog("debug-command --> gdb.debug() error: {}".format(e))
+        finally:
+            if gdb_type_res:
+                __recover(gdb_type_res[1], gdb_type_res[0])
+    else:
+        # gdb.attach() mode: attach to running process
+        _set_terminal(ctx, ctx.gift['io'], t_flag, attach_mode,
+                      use_gdb, gdb_type, script, is_file, gdb_script)
 
     if pause_before_main:
         pause()  # avoid read from stdin
@@ -596,17 +640,20 @@ int %s()
 @click.option('-s', '-gs', '--gdb-script', "gdb_script", default=None, type=str, show_default=True, help="Set gdb commands like '-ex' or '-x' while gdb-debug is used, the content will be passed to gdb and use ';' to split lines. Besides eval-commands, file path is supported.")
 @click.option('-n', '-nl', '--no-log', "no_log", is_flag=True, show_default=True, help="Disable context.log or not.")
 @click.option('-P', '-ns', '--no-stop', "no_stop", is_flag=True, show_default=True, help="Use the 'stop' function or not. Only for python script mode.")
+@click.option('-M', '--gdb-method', "gdb_method", type=click.Choice(['attach', 'debug']), nargs=1, default='attach', show_default=True, help="Use gdb.attach() or gdb.debug(). 'debug' lets gdb start the process, stopping at entry — easier to break on main.")
 @click.option('-v', '--verbose', count=True, help="Show more info or not.")
 @pass_environ
 def cli(ctx, verbose, filename, argv, env, gdb_tbreakpoint,
         tmux, wsl, gnome, attach_mode, use_gdb, gdb_type, gdb_breakpoint, gdb_script,
-        no_log, no_stop, pause_before_main, hook_file, hook_function):
+        no_log, no_stop, pause_before_main, hook_file, hook_function, gdb_method):
     """FILENAME: The ELF filename.
 
     \b
-    Debug in tmux:
+    Debug in tmux (attach mode, default):
         python3 exp.py debug ./pwn --tmux --gdb-breakpoint malloc -gb 0x400789
         python3 exp.py debug ./pwn --tmux --env LD_PRELOAD:./libc-2.27.so
+    Debug in tmux (debug mode, gdb starts the process):
+        python3 exp.py debug ./pwn --tmux -M debug -b main
     """
     ctx.vlog("Welcome to use pwncli-debug command~")
     if not ctx.verbose:
@@ -635,6 +682,7 @@ def cli(ctx, verbose, filename, argv, env, gdb_tbreakpoint,
     args.hook_function = hook_function
     args.no_log = no_log
     args.no_stop = no_stop
+    args.gdb_method = gdb_method
 
     # log verbose info
     for k, v in args.items():
@@ -650,4 +698,4 @@ def cli(ctx, verbose, filename, argv, env, gdb_tbreakpoint,
     # set value
     _check_set_value(ctx, filename, argv, env, tmux, wsl, gnome, attach_mode,
                      use_gdb, gdb_type, gdb_breakpoint, gdb_script, pause_before_main,
-                     hook_file, hook_function, gdb_tbreakpoint)
+                     hook_file, hook_function, gdb_tbreakpoint, gdb_method)
