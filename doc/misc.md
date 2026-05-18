@@ -230,3 +230,31 @@ with TimeoutPwncli(seconds=5, timeout_msg="Timeout!"):
         do_something()
 # 5 秒后抛出 TimeoutError
 ```
+
+***
+
+## 8 URL 编码/解码
+
+Web-pwn 和 IoT 题目中，payload 经常需要 URL 编码后通过 HTTP 传输。
+
+```python
+from pwncli import url_encode, url_decode
+
+# 编码 payload（所有非 ASCII 可打印字符都会被 %XX 编码）
+payload = b"\x00\x01/bin/sh\x00"
+url_encode(payload)               # -> '%00%01%2Fbin%2Fsh%00'
+
+# 保留某些字符不编码
+url_encode(b"/cgi-bin/pwn?a=1", safe="/:?=")
+# -> '/cgi-bin/pwn?a=1'
+
+# ROP payload 编码
+rop = p64(pop_rdi) + p64(bin_sh) + p64(system)
+encoded_rop = url_encode(rop)     # 可以直接拼进 HTTP 请求
+
+# 解码回 bytes
+url_decode('%00%01%2Fbin%2Fsh%00')  # -> b'\x00\x01/bin/sh\x00'
+
+# 完整 roundtrip
+assert url_decode(url_encode(payload)) == payload
+```

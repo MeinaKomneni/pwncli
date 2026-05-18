@@ -135,6 +135,9 @@ __all__ = [
     "call_CDLL_func",
     "TimeoutPwncli",
 
+    # encoding
+    "url_encode",
+    "url_decode",
 ]
 
 class _Inner_Dict(OrderedDict):
@@ -988,6 +991,52 @@ def _get_gdb_plugin_info():
                 elif "peda" in line:
                     return "peda"
     return None
+
+
+def url_encode(data, safe='') -> str:
+    """URL-encode bytes/str payload. Useful for web-pwn / IoT challenges.
+
+    Args:
+        data: bytes or str to encode
+        safe: characters to NOT encode (default: encode everything)
+
+    Returns:
+        URL-encoded string
+
+    Examples:
+        >>> url_encode(b'\\x00\\x01/bin/sh\\x00')
+        '%00%01%2Fbin%2Fsh%00'
+        >>> url_encode(b'hello world')
+        'hello%20world'
+        >>> url_encode(b'/bin/sh', safe='/')
+        '/bin/sh'
+    """
+    from urllib.parse import quote
+    if isinstance(data, str):
+        data = data.encode('latin-1')
+    return quote(data, safe=safe)
+
+
+def url_decode(data) -> bytes:
+    """URL-decode a string back to bytes.
+
+    Args:
+        data: URL-encoded string (e.g. '%00%01%2Fbin')
+
+    Returns:
+        Decoded bytes
+
+    Examples:
+        >>> url_decode('%00%01%2Fbin%2Fsh%00')
+        b'\\x00\\x01/bin/sh\\x00'
+        >>> url_decode('hello%20world')
+        b'hello world'
+    """
+    from urllib.parse import unquote_to_bytes
+    if isinstance(data, bytes):
+        data = data.decode('ascii')
+    return unquote_to_bytes(data)
+
 
 if __name__ == "__main__":
     import doctest
