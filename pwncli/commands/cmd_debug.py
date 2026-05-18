@@ -593,10 +593,11 @@ int %s()
         gdb_type_res = None
         try:
             gdb_type_res = _set_gdb_type(ctx.pwncli_path, gdb_type)
-            gdb_args = [filename] + argv if argv else [filename]
+            exe_path = os.path.realpath(filename)
+            gdb_args = [exe_path] + argv
             ctx.gift['io'] = gdb_debug(gdb_args, gdbscript=script, env=env, api=True)
-            if isinstance(ctx.gift['io'], tuple):
-                ctx.gift['io'], ctx.gift['gdb_obj'] = ctx.gift['io']
+            if hasattr(ctx.gift['io'], 'gdb'):
+                ctx.gift['gdb_obj'] = ctx.gift['io'].gdb
         except Exception as e:
             ctx.verrlog("debug-command --> gdb.debug() error: {}".format(e))
         finally:
