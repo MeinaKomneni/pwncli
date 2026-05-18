@@ -138,6 +138,8 @@ __all__ = [
     # encoding
     "url_encode",
     "url_decode",
+    "b64_encode",
+    "b64_decode",
 ]
 
 class _Inner_Dict(OrderedDict):
@@ -1036,6 +1038,48 @@ def url_decode(data) -> bytes:
     if isinstance(data, bytes):
         data = data.decode('ascii')
     return unquote_to_bytes(data)
+
+
+def b64_encode(data) -> str:
+    """Base64-encode bytes/str payload.
+
+    Args:
+        data: bytes or str to encode
+
+    Returns:
+        Base64-encoded string (no newlines)
+
+    Examples:
+        >>> b64_encode(b'\\x00\\x01\\x02\\xff')
+        'AAEC/w=='
+        >>> b64_encode(b'/bin/sh')
+        'L2Jpbi9zaA=='
+    """
+    from base64 import b64encode
+    if isinstance(data, str):
+        data = data.encode('latin-1')
+    return b64encode(data).decode('ascii')
+
+
+def b64_decode(data) -> bytes:
+    """Base64-decode a string back to bytes.
+
+    Args:
+        data: Base64-encoded string
+
+    Returns:
+        Decoded bytes
+
+    Examples:
+        >>> b64_decode('AAEC/w==')
+        b'\\x00\\x01\\x02\\xff'
+        >>> b64_decode('L2Jpbi9zaA==')
+        b'/bin/sh'
+    """
+    from base64 import b64decode
+    if isinstance(data, bytes):
+        data = data.decode('ascii')
+    return b64decode(data)
 
 
 if __name__ == "__main__":

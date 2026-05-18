@@ -233,9 +233,11 @@ with TimeoutPwncli(seconds=5, timeout_msg="Timeout!"):
 
 ***
 
-## 8 URL 编码/解码
+## 8 编码/解码
 
-Web-pwn 和 IoT 题目中，payload 经常需要 URL 编码后通过 HTTP 传输。
+Web-pwn 和 IoT 题目中，payload 经常需要编码后通过 HTTP 等协议传输。
+
+### URL 编码
 
 ```python
 from pwncli import url_encode, url_decode
@@ -254,7 +256,20 @@ encoded_rop = url_encode(rop)     # 可以直接拼进 HTTP 请求
 
 # 解码回 bytes
 url_decode('%00%01%2Fbin%2Fsh%00')  # -> b'\x00\x01/bin/sh\x00'
+```
 
-# 完整 roundtrip
-assert url_decode(url_encode(payload)) == payload
+### Base64 编码
+
+```python
+from pwncli import b64_encode, b64_decode
+
+# 编码
+b64_encode(b"\x00\x01\x02\xff")    # -> 'AAEC/w=='
+b64_encode(b"/bin/sh")              # -> 'L2Jpbi9zaA=='
+
+# 解码
+b64_decode('AAEC/w==')              # -> b'\x00\x01\x02\xff'
+
+# roundtrip
+assert b64_decode(b64_encode(payload)) == payload
 ```
