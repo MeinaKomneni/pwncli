@@ -541,7 +541,6 @@ int %s()
         script = _script
 
     if script:
-        script += "c\n"
         ctx.vlog(
             "debug-command 'gdbscript content':\n{}\n{}{}\n".format("="*20, script, "="*20))
         if is_file:  # 更新gdb file

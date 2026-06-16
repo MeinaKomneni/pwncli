@@ -117,6 +117,20 @@ kill_current_gdb()
 launch_current_gdb(gdbscript="b *main\nc", stop_=True)
 ```
 
+### attach_existing_process
+
+附加 gdb 到一个已经在运行的进程，不依赖 pwncli 的 debug 模式。`target` 可以是 pid（int），也可以是进程名（str）。给进程名时按 comm 做精确匹配；匹配到多个进程时会给出告警并选取 pid 最小的那一个。
+
+```python
+# 按 pid 附加
+attach_existing_process(1234, gdbscript="b *main\nc")
+
+# 按进程名附加（重名时告警并取第一个）
+attach_existing_process("pwn_binary", gdbscript="c", stop_=False)
+```
+
+进程名解析依赖系统的 `pgrep`。注意内核里 comm 字段最长 15 个字符，过长的进程名需用其截断后的名字或直接用 pid。
+
 ### 动态定义结构体
 
 ```python

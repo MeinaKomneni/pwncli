@@ -1,8 +1,6 @@
 
 
-# consts — 常用 C/Linux 宏常量速查
-
-闭网考试时记不住宏对应的整数？`Consts` 帮你快速查。
+# consts — 常用 C/Linux 宏常量与系统调用号
 
 ***
 
@@ -15,8 +13,13 @@ from pwncli import Consts
 prot = Consts.mmap.PROT_READ | Consts.mmap.PROT_WRITE  # 0x3
 flags = Consts.mmap.MAP_PRIVATE | Consts.mmap.MAP_ANONYMOUS  # 0x22
 
+# 系统调用号
+Consts.syscall.amd64.EXECVE   # 59
+Consts.syscall.i386.OPENAT    # 295
+
 # 打印某一组
 Consts.show("mmap")
+Consts.show("syscall")
 
 # 打印全部
 Consts.show()
@@ -24,9 +27,9 @@ Consts.show()
 
 ***
 
-## CTF 常用组合速查
+## 常用组合
 
-闭网打比赛时最常用的几个组合，直接抄：
+常用的几个组合：
 
 ```python
 # ========== mmap: 开一块 RWX 内存写 shellcode ==========
@@ -58,9 +61,9 @@ mprotect(buf_addr & ~0xfff, 0x1000, 7)
 # socket(2, 1, 0)                AF_INET=2, SOCK_STREAM=1
 ```
 
-### 纯数字速记卡
+### 纯数字
 
-打 ROP 时经常要手填立即数，下面是最高频的几个：
+打 ROP 时经常要手填立即数：
 
 | 场景 | 参数 | 值 |
 |------|------|----|
@@ -172,3 +175,42 @@ mprotect(buf_addr & ~0xfff, 0x1000, 7)
 | PTRACE_PEEKDATA | 2 | | PTRACE_ATTACH | 16 |
 | PTRACE_POKETEXT | 4 | | PTRACE_DETACH | 17 |
 | PTRACE_CONT | 7 | | PTRACE_SINGLESTEP | 9 |
+
+### syscall
+
+i386 和 amd64 的系统调用号，打 ROP / SROP 时常用：
+
+```python
+Consts.syscall.amd64.READ       # 0
+Consts.syscall.amd64.WRITE      # 1
+Consts.syscall.amd64.OPEN       # 2
+Consts.syscall.amd64.MPROTECT   # 10
+Consts.syscall.amd64.EXECVE     # 59
+Consts.syscall.amd64.OPENAT     # 257
+
+Consts.syscall.i386.READ        # 3
+Consts.syscall.i386.WRITE       # 4
+Consts.syscall.i386.EXECVE      # 11
+Consts.syscall.i386.MPROTECT    # 125
+Consts.syscall.i386.OPENAT      # 295
+```
+
+常用调用号速查：
+
+| 系统调用 | amd64 | i386 |
+|----------|-------|------|
+| READ | 0 | 3 |
+| WRITE | 1 | 4 |
+| OPEN | 2 | 5 |
+| CLOSE | 3 | 6 |
+| MMAP | 9 | 90 |
+| MPROTECT | 10 | 125 |
+| BRK | 12 | 45 |
+| EXECVE | 59 | 11 |
+| SOCKET | 41 | 359 |
+| CONNECT | 42 | 362 |
+| OPENAT | 257 | 295 |
+| EXECVEAT | 322 | 358 |
+| SECCOMP | 317 | 354 |
+
+完整的调用号定义见 `pwncli/utils/consts.py` 的 `Consts.syscall` 内嵌类。

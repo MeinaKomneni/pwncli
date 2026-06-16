@@ -12,11 +12,10 @@ from .libcbox import *
 from .misc import *
 from .pipes import *
 from .shellcode import *
-from .syscall_num import *
 
 from . import (bruteforce, cli_decorates, cli_misc, config, consts, decorates,
                exceptions, gadgetbox, gdb_helper, io_file, libcbox,
-               misc, pipes, shellcode, syscall_num)
+               misc, pipes, shellcode)
 
 __all__: list[str] = []
 __all__ += bruteforce.__all__
@@ -33,4 +32,3 @@ __all__ += libcbox.__all__
 __all__ += misc.__all__
 __all__ += pipes.__all__
 __all__ += shellcode.__all__
-__all__ += syscall_num.__all__

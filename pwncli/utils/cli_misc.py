@@ -28,7 +28,7 @@ from .misc import (_in_tmux, _in_wsl, call_CDLL_func, errlog_exit,
                    ldd_get_libc_path, log2_ex, log_code_base_addr, log_ex,
                    log_libc_base_addr, one_gadget, one_gadget_binary,
                    recv_libc_addr, step_split, u64_ex, warn_ex, gift)
-from .syscall_num import SyscallNumber
+from .consts import Consts
 
 __all__ = [
     "stop",
@@ -40,8 +40,9 @@ __all__ = [
     "get_current_libcbase_addr",
     "get_current_stackbase_addr",
     "get_current_heapbase_addr",
-    # manipulate current gdb, from attach(target, xxx) 
+    # manipulate current gdb, from attach(target, xxx)
     "launch_current_gdb",
+    "attach_existing_process",
     "kill_current_gdb",
     "send_signal2current_gdbprocess",
     "execute_cmd_in_current_gdb",
@@ -319,6 +320,65 @@ def launch_heaptrace(stop_=True, malloc_off='', free_off='', realloc_off=''):
 def launch_current_gdb(gdbscript: str, stop_=True):
     attach(gift.io, gdbscript=gdbscript)
     stop(stop_)
+
+
+def _pids_by_process_name(name: str) -> list:
+    """Resolve a process name to a list of pids, ordered by pid ascending.
+
+    Use `pgrep -x` for an exact match on the process name (the comm field,
+    truncated to 15 chars by the kernel). Matching the full command line is
+    intentionally avoided: it would attach to unrelated processes that merely
+    mention the name in their arguments.
+    """
+    try:
+        out = subprocess.check_output(["pgrep", "-x", name], stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        out = b""
+    except FileNotFoundError:
+        errlog_exit("'pgrep' not found, cannot resolve process name '{}'.".format(name))
+    return sorted(int(x) for x in out.split())
+
+
+def attach_existing_process(target, gdbscript: str = "", stop_=True):
+    """Attach gdb to an already-running process by pid or process name.
+
+    Unlike `launch_current_gdb`, this does not require pwncli's debug mode and
+    works on any existing process.
+
+    Args:
+        target (int | str): the pid (int) or process name (str) to attach to.
+            When a name matches more than one process, a warning is shown and
+            the one with the smallest pid is chosen.
+        gdbscript (str): gdb commands to run right after attaching.
+        stop_ (bool): pause the script after attaching. Defaults to True.
+
+    Returns:
+        The gdb instance returned by pwntools `attach`, or None on failure.
+    """
+    if isinstance(target, str) and target.strip().isdigit():
+        target = int(target.strip())
+
+    if isinstance(target, int):
+        pid = target
+    elif isinstance(target, str):
+        pids = _pids_by_process_name(target)
+        if not pids:
+            errlog_exit("No running process named '{}' found.".format(target))
+        if len(pids) > 1:
+            warn_ex("Multiple processes named '{}' found: {}. Attaching to the first one: {}.".format(
+                target, pids, pids[0]))
+        pid = pids[0]
+    else:
+        errlog_exit("attach_existing_process: 'target' must be a pid (int) or a process name (str), got {}.".format(
+            type(target).__name__))
+
+    if not os.path.exists("/proc/{}".format(pid)):
+        errlog_exit("Process with pid {} does not exist.".format(pid))
+
+    log_ex("Attaching gdb to existing process, pid: {}".format(pid))
+    res = attach(pid, gdbscript=gdbscript)
+    stop(stop_)
+    return res
 
 # ----------------------------useful function-------------------------
 
@@ -1340,27 +1400,27 @@ class CurrentGadgets:
 
     @staticmethod
     def execve_chain(bin_sh_addr=None) -> bytes:
-        return CurrentGadgets.__inner_chain(SyscallNumber.i386.EXECVE, SyscallNumber.amd64.EXECVE, bin_sh_addr or CurrentGadgets.bin_sh(), 0, 0)
+        return CurrentGadgets.__inner_chain(Consts.syscall.i386.EXECVE, Consts.syscall.amd64.EXECVE, bin_sh_addr or CurrentGadgets.bin_sh(), 0, 0)
 
     @staticmethod
     def mprotect_chain(va, length=0x1000, prog=7) -> bytes:
-        return CurrentGadgets.__inner_chain(SyscallNumber.i386.MPROTECT, SyscallNumber.amd64.MPROTECT, va, length, prog)
+        return CurrentGadgets.__inner_chain(Consts.syscall.i386.MPROTECT, Consts.syscall.amd64.MPROTECT, va, length, prog)
 
     @staticmethod
     def open_chain(fileaddr, flag=0, mode=None) -> bytes:
-        return CurrentGadgets.__inner_chain(SyscallNumber.i386.OPEN, SyscallNumber.amd64.OPEN, fileaddr, flag, mode)
+        return CurrentGadgets.__inner_chain(Consts.syscall.i386.OPEN, Consts.syscall.amd64.OPEN, fileaddr, flag, mode)
 
     @staticmethod
     def openat_chain(fileaddr, flag=0) -> bytes:
-        return CurrentGadgets.__inner_chain(SyscallNumber.i386.OPENAT, SyscallNumber.amd64.OPENAT, -100, fileaddr, flag)
+        return CurrentGadgets.__inner_chain(Consts.syscall.i386.OPENAT, Consts.syscall.amd64.OPENAT, -100, fileaddr, flag)
 
     @staticmethod
     def read_chain(fd, buf, length) -> bytes:
-        return CurrentGadgets.__inner_chain(SyscallNumber.i386.READ, SyscallNumber.amd64.READ, fd, buf, length)
+        return CurrentGadgets.__inner_chain(Consts.syscall.i386.READ, Consts.syscall.amd64.READ, fd, buf, length)
 
     @staticmethod
     def write_chain(fd, buf, length) -> bytes:
-        return CurrentGadgets.__inner_chain(SyscallNumber.i386.WRITE, SyscallNumber.amd64.WRITE, fd, buf, length)
+        return CurrentGadgets.__inner_chain(Consts.syscall.i386.WRITE, Consts.syscall.amd64.WRITE, fd, buf, length)
 
     @staticmethod
     def orw_chain(flag_addr, buf_addr=None, flag_fd=3, write_fd=1, buf_len=0x30) -> bytes:
