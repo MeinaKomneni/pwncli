@@ -649,11 +649,12 @@ def cli(ctx, verbose, filename, argv, env, gdb_tbreakpoint,
     """FILENAME: The ELF filename.
 
     \b
-    Debug in tmux (attach mode, default):
-        python3 exp.py debug ./pwn --tmux --gdb-breakpoint malloc -gb 0x400789
-        python3 exp.py debug ./pwn --tmux --env LD_PRELOAD:./libc-2.27.so
-    Debug in tmux (debug mode, gdb starts the process):
-        python3 exp.py debug ./pwn --tmux -M debug -b main
+    CLI mode:
+        pwncli debug ./pwn -t -b malloc -gb 0x400789
+        pwncli debug ./pwn -t --env LD_PRELOAD:./libc-2.27.so
+        pwncli debug ./pwn -t -M debug -b main
+    Script mode:
+        python3 exp.py debug ./pwn -t -b malloc
     """
     ctx.vlog("Welcome to use pwncli-debug command~")
     if not ctx.verbose:
@@ -661,6 +662,13 @@ def cli(ctx, verbose, filename, argv, env, gdb_tbreakpoint,
     if verbose:
         ctx.vlog("debug-command --> Open 'verbose' mode")
     ctx.gift._debug_command = True
+
+    gift_gs = ctx.gift.get('gdb_script')
+    if gdb_script is None:
+        gdb_script = gift_gs
+    elif gift_gs:
+        gdb_script = gift_gs + ';' + gdb_script
+
     gdb_breakpoint = list(gdb_breakpoint)
     gdb_tbreakpoint = list(gdb_tbreakpoint)
     hook_function = list(hook_function)

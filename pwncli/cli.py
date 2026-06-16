@@ -86,7 +86,12 @@ class CommandsAliasedGroup(click.Group):
                 mod = __import__("pwncli.commands.cmd_{}".format(matches[0]), None, None, ["cli"])
             except ImportError:
                 raise
-            return mod.cli
+            cmd = mod.cli
+            if 'help_option_names' not in cmd.context_settings:
+                has_dash_h = any('-h' in p.opts for p in cmd.params)
+                if not has_dash_h:
+                    cmd.context_settings['help_option_names'] = ['-h', '--help']
+            return cmd
         else:
             ctx.fail('\033[31mpwncli --> Too many matches: %s\033[0m' % ', '.join(sorted(matches)))
         
@@ -203,25 +208,24 @@ def cli(ctx, filename, verbose, extra_argv): # ctx: command property
     
 
 def set_gdb_script(script: str):
-    """Inject a gdb script into sys.argv so the debug command picks it up.
+    """Set gdb script for the debug command.
 
-    Call this BEFORE cli_script(). Lines are joined with ';' as the debug
-    command expects.
+    Call this BEFORE cli_script(). The script is stored in gift and
+    picked up by the debug command automatically.
     """
     merged = ";".join(line for line in script.strip().splitlines() if line.strip())
-    for i, arg in enumerate(sys.argv):
-        if arg in ('-s', '-gs', '--gdb-script'):
-            sys.argv[i + 1] = merged
-            return
-    sys.argv.extend(['-s', merged])
+    gift['gdb_script'] = merged
 
 
 def cli_script():
     try:
         cli.main(standalone_mode=False)
-    except click.exceptions.UsageError:
-        cli.main(['--help'], standalone_mode=False)
-        sys.exit(0)
+    except click.exceptions.UsageError as e:
+        if e.ctx:
+            click.echo(e.ctx.get_help())
+        else:
+            click.echo(e.format_message())
+        sys.exit(1)
 
 
 
