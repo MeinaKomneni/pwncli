@@ -131,6 +131,24 @@ attach_existing_process("pwn_binary", gdbscript="c", stop_=False)
 
 进程名解析依赖系统的 `pgrep`。注意内核里 comm 字段最长 15 个字符，过长的进程名需用其截断后的名字或直接用 pid。
 
+### gdb_cmd
+
+在 exp 脚本运行过程中向 gdb 发送命令并获取输出（仅 tmux 模式）。与 `execute_cmd_in_current_gdb`（只管发不管收）不同，`gdb_cmd` 会等待 gdb 执行完毕并返回输出文本。打 heap 题时用它来动态查看堆布局特别方便：
+
+```python
+# 查看堆布局
+output = gdb_cmd("heap")
+print(output)
+
+# 查看内存
+output = gdb_cmd("x/40gx 0x55555555b000")
+
+# 复杂/耗时命令，调大 timeout
+output = gdb_cmd("search-pattern /bin/sh", timeout=15.0)
+```
+
+底层流程：先发 Ctrl-C（确保 gdb 回到 prompt，如果已在 prompt 则无影响），再 Ctrl-L 清屏，然后发命令，轮询 `capture-pane` 等 prompt 再次出现后截取输出。`wait` 控制轮询间隔（默认 0.5s），`timeout` 控制最大等待（默认 10s）。非 tmux 环境下调用会 warn 并返回空字符串。
+
 ### 动态定义结构体
 
 ```python

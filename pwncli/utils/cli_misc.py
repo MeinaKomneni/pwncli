@@ -67,7 +67,9 @@ __all__ = [
     # play with gadgets
     "CurrentGadgets", "load_currentgadgets_background", "CG",
     # play with heaptrace
-    "kill_heaptrace", "launch_heaptrace", 
+    "kill_heaptrace", "launch_heaptrace",
+    # runtime gdb interaction
+    "gdb_cmd",
     # cli decorators
     "only_debug", "only_gdb", "only_remote", "only_nogdb", "only_debug_or_remote",
     "call_current_CDLL_func",
@@ -379,6 +381,102 @@ def attach_existing_process(target, gdbscript: str = "", stop_=True):
     res = attach(pid, gdbscript=gdbscript)
     stop(stop_)
     return res
+
+
+def gdb_cmd(cmd: str, wait: float = 0.5, timeout: float = 10.0, quiet: bool = False) -> str:
+    """Send a command to the running gdb in tmux and return its output.
+
+    Unlike execute_cmd_in_current_gdb (fire-and-forget), this captures and
+    returns the gdb output. Useful for inspecting heap/memory/registers
+    mid-exploit.
+
+    Args:
+        cmd: gdb command (e.g. "heap", "x/40gx 0x555...", "bins").
+        wait: seconds to wait between each poll for gdb output completion.
+        timeout: max seconds to wait for gdb to produce a prompt.
+        quiet: if True, suppress printing the output.
+
+    Returns:
+        Captured gdb output as a string. Empty string on failure.
+    """
+    pane = _get_tmux_info()
+    if not pane:
+        warn_ex("gdb_cmd: not in tmux, cannot send command to gdb.")
+        return ""
+
+    _prompt_markers = ('pwndbg>', 'gef>', 'gdb>', '(gdb)')
+
+    def _capture():
+        try:
+            return subprocess.check_output(
+                ["tmux", "capture-pane", "-t", pane, "-p"]
+            ).decode(errors='replace')
+        except subprocess.CalledProcessError:
+            return ""
+
+    def _has_prompt(text):
+        for line in reversed(text.strip().splitlines()):
+            stripped = line.strip()
+            if stripped:
+                return any(stripped.startswith(m) or stripped.endswith(m) for m in _prompt_markers)
+        return False
+
+    def _wait_for_prompt():
+        elapsed = 0.0
+        while elapsed < timeout:
+            time.sleep(wait)
+            elapsed += wait
+            snap = _capture()
+            if _has_prompt(snap):
+                return snap
+        return _capture()
+
+    # 反复发 Ctrl-C 直到 gdb 回到 prompt(已在 prompt 时 C-c 无影响)
+    elapsed = 0.0
+    while elapsed < timeout:
+        snap = _capture()
+        if _has_prompt(snap):
+            break
+        os.system("tmux send-keys -t {} C-c".format(pane))
+        time.sleep(wait)
+        elapsed += wait
+
+    # Ctrl-L 清屏,让 pane 只剩 prompt
+    os.system("tmux send-keys -t {} C-l".format(pane))
+    time.sleep(0.1)
+
+    # 发送命令
+    escaped = cmd.replace("\\", "\\\\").replace("'", "'\\''")
+    os.system("tmux send-keys -t {} '{}' Enter".format(pane, escaped))
+
+    # 等命令执行完(prompt 再次出现)
+    time.sleep(0.2)
+    raw = _wait_for_prompt()
+
+    # 解析:去掉首行(命令回显)和末行(prompt)
+    result_lines = raw.strip().splitlines()
+    # 去掉开头的 prompt + 命令回显行
+    while result_lines:
+        line = result_lines[0].strip()
+        if any(line.startswith(m) for m in _prompt_markers):
+            result_lines.pop(0)
+            continue
+        if line.startswith(cmd.split()[0]):
+            result_lines.pop(0)
+            continue
+        break
+    # 去掉末尾的 prompt 行
+    while result_lines:
+        line = result_lines[-1].strip()
+        if not line or any(line.startswith(m) or line.endswith(m) for m in _prompt_markers):
+            result_lines.pop()
+        else:
+            break
+    result = '\n'.join(result_lines).strip()
+    if result and not quiet:
+        print(result)
+    return result
+
 
 # ----------------------------useful function-------------------------
 
