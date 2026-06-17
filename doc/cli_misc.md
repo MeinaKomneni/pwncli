@@ -145,9 +145,34 @@ output = gdb_cmd("x/40gx 0x55555555b000")
 
 # 复杂/耗时命令，调大 timeout
 output = gdb_cmd("search-pattern /bin/sh", timeout=15.0)
+
+# 静默获取，不自动打印
+addr = gdb_cmd("p $_base", quiet=True)
 ```
 
-底层流程：先发 Ctrl-C（确保 gdb 回到 prompt，如果已在 prompt 则无影响），再 Ctrl-L 清屏，然后发命令，轮询 `capture-pane` 等 prompt 再次出现后截取输出。`wait` 控制轮询间隔（默认 0.5s），`timeout` 控制最大等待（默认 10s）。非 tmux 环境下调用会 warn 并返回空字符串。
+底层流程：先发 Ctrl-C（确保 gdb 回到 prompt，如果已在 prompt 则无影响），再 Ctrl-L 清屏，然后发命令，轮询 `capture-pane` 等 prompt 再次出现后截取输出。`wait` 控制轮询间隔（默认 0.5s），`timeout` 控制最大等待（默认 10s）。`capture_lines` 用于长输出命令（如 `heap`），设为正数时会先清滚动缓冲，保证抓到的纯粹是本次命令的输出（副作用是破坏 pane 滚动历史）。非 tmux 环境下调用会 warn 并返回空字符串。
+
+**remote 模式自动禁用**：当 `gift['remote']` 为真时，`gdb_cmd` 及以下所有派生函数都会 warn 并返回空值——remote 目标上没有本地附加的 gdb，调用这些函数没有意义。这样在本地 debug 时写好的堆调试代码，切到 remote 打同一道题时不会报错，只是静默跳过。
+
+### 堆地址快捷函数
+
+基于 pwndbg 的 heap Python API（`pwndbg.aglib.heap.current`）直接取值，返回干净整数而非解析表格文本，跨输出格式变化更稳。均需 pwndbg，且仅在 debug+tmux 下有意义：
+
+```python
+top  = gdb_top_chunk_addr()   # main_arena.top
+base = gdb_heap_base()        # main_arena.active_heap.start
+```
+
+堆未初始化或 pwndbg 不可用时返回 0。
+
+### bins / heap 原始输出
+
+```python
+bins_out = gdb_bins()   # pwndbg bins（tcache+fast+unsorted+small+large）
+heap_out = gdb_heap()   # pwndbg heap（完整 chunk 列表）
+```
+
+两者默认打印输出并返回字符串，内部用 `capture_lines` 抓取长输出。特大堆仍可能被截断。
 
 ### 动态定义结构体
 

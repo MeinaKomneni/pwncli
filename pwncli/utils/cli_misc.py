@@ -11,6 +11,7 @@
 
 import functools
 import os
+import re
 import subprocess
 import time
 from threading import Lock, Thread
@@ -69,7 +70,7 @@ __all__ = [
     # play with heaptrace
     "kill_heaptrace", "launch_heaptrace",
     # runtime gdb interaction
-    "gdb_cmd",
+    "gdb_cmd", "gdb_top_chunk_addr", "gdb_heap_base", "gdb_bins", "gdb_heap",
     # cli decorators
     "only_debug", "only_gdb", "only_remote", "only_nogdb", "only_debug_or_remote",
     "call_current_CDLL_func",
@@ -383,7 +384,8 @@ def attach_existing_process(target, gdbscript: str = "", stop_=True):
     return res
 
 
-def gdb_cmd(cmd: str, wait: float = 0.5, timeout: float = 10.0, quiet: bool = False) -> str:
+def gdb_cmd(cmd: str, wait: float = 0.5, timeout: float = 10.0,
+            quiet: bool = False, capture_lines: int = 0) -> str:
     """Send a command to the running gdb in tmux and return its output.
 
     Unlike execute_cmd_in_current_gdb (fire-and-forget), this captures and
@@ -395,10 +397,20 @@ def gdb_cmd(cmd: str, wait: float = 0.5, timeout: float = 10.0, quiet: bool = Fa
         wait: seconds to wait between each poll for gdb output completion.
         timeout: max seconds to wait for gdb to produce a prompt.
         quiet: if True, suppress printing the output.
+        capture_lines: if >0, capture this many lines of scrollback (for long
+            outputs like `heap`). When set, the pane's scrollback history is
+            cleared first so only the new command's output is captured.
+            Note: this destroys the pane's scrollback as a side effect.
 
     Returns:
-        Captured gdb output as a string. Empty string on failure.
+        Captured gdb output as a string. Empty string on failure or when
+        disabled (e.g. remote mode, not in tmux).
     """
+    # remote 模式下没有附加在目标上的本地 gdb,直接禁用
+    if gift.get('remote'):
+        warn_ex("gdb_cmd: disabled in remote mode (no local gdb on the target).")
+        return ""
+
     pane = _get_tmux_info()
     if not pane:
         warn_ex("gdb_cmd: not in tmux, cannot send command to gdb.")
@@ -406,11 +418,12 @@ def gdb_cmd(cmd: str, wait: float = 0.5, timeout: float = 10.0, quiet: bool = Fa
 
     _prompt_markers = ('pwndbg>', 'gef>', 'gdb>', '(gdb)')
 
-    def _capture():
+    def _capture(history=0):
+        args = ["tmux", "capture-pane", "-t", pane, "-p"]
+        if history:
+            args += ["-S", str(-history)]
         try:
-            return subprocess.check_output(
-                ["tmux", "capture-pane", "-t", pane, "-p"]
-            ).decode(errors='replace')
+            return subprocess.check_output(args).decode(errors='replace')
         except subprocess.CalledProcessError:
             return ""
 
@@ -421,15 +434,15 @@ def gdb_cmd(cmd: str, wait: float = 0.5, timeout: float = 10.0, quiet: bool = Fa
                 return any(stripped.startswith(m) or stripped.endswith(m) for m in _prompt_markers)
         return False
 
-    def _wait_for_prompt():
+    def _wait_for_prompt(history=0):
         elapsed = 0.0
         while elapsed < timeout:
             time.sleep(wait)
             elapsed += wait
-            snap = _capture()
+            snap = _capture(history) if history else _capture()
             if _has_prompt(snap):
                 return snap
-        return _capture()
+        return _capture(history) if history else _capture()
 
     # 反复发 Ctrl-C 直到 gdb 回到 prompt(已在 prompt 时 C-c 无影响)
     elapsed = 0.0
@@ -441,9 +454,13 @@ def gdb_cmd(cmd: str, wait: float = 0.5, timeout: float = 10.0, quiet: bool = Fa
         time.sleep(wait)
         elapsed += wait
 
-    # Ctrl-L 清屏,让 pane 只剩 prompt
+    # Ctrl-L 清屏,让 pane 只剩 prompt(C-l 会把可见区推入 scrollback)
     os.system("tmux send-keys -t {} C-l".format(pane))
     time.sleep(0.1)
+    # 需要抓长输出时,在 C-l 之后再清 scrollback:否则 C-l 推入的旧内容(可能含
+    # 上一次同命令的回显)会留在 scrollback 里,导致 -S -N 捕获时第一个回显命中旧的
+    if capture_lines:
+        os.system("tmux clear-history -t {}".format(pane))
 
     # 发送命令
     escaped = cmd.replace("\\", "\\\\").replace("'", "'\\''")
@@ -451,21 +468,28 @@ def gdb_cmd(cmd: str, wait: float = 0.5, timeout: float = 10.0, quiet: bool = Fa
 
     # 等命令执行完(prompt 再次出现)
     time.sleep(0.2)
-    raw = _wait_for_prompt()
+    raw = _wait_for_prompt(capture_lines) if capture_lines else _wait_for_prompt()
 
-    # 解析:去掉首行(命令回显)和末行(prompt)
-    result_lines = raw.strip().splitlines()
-    # 去掉开头的 prompt + 命令回显行
-    while result_lines:
-        line = result_lines[0].strip()
-        if any(line.startswith(m) for m in _prompt_markers):
-            result_lines.pop(0)
-            continue
-        if line.startswith(cmd.split()[0]):
-            result_lines.pop(0)
-            continue
-        break
-    # 去掉末尾的 prompt 行
+    # 解析:定位命令回显行(pwndbg> <cmd>),丢弃到该行(含),取其后内容
+    # 这样即便 capture -S 抓到了 C-l 推入 scrollback 的旧内容,也会被回显行隔开丢掉
+    result_lines = raw.splitlines()
+    cmd_head = cmd.strip()
+
+    def _strip_prompt_prefix(s):
+        for m in _prompt_markers:
+            if s.startswith(m):
+                return s[len(m):].strip()
+        return s.strip()
+
+    echo_idx = -1
+    for i, line in enumerate(result_lines):
+        if _strip_prompt_prefix(line).startswith(cmd_head):
+            echo_idx = i
+            break
+    if echo_idx >= 0:
+        result_lines = result_lines[echo_idx + 1:]
+
+    # 去掉末尾的空行/prompt 行
     while result_lines:
         line = result_lines[-1].strip()
         if not line or any(line.startswith(m) or line.endswith(m) for m in _prompt_markers):
@@ -476,6 +500,57 @@ def gdb_cmd(cmd: str, wait: float = 0.5, timeout: float = 10.0, quiet: bool = Fa
     if result and not quiet:
         print(result)
     return result
+
+
+def _parse_hex_int(text: str) -> int:
+    """Extract the first 0x.. integer from gdb output, 0 if none."""
+    if not text:
+        return 0
+    m = re.search(r'0x[0-9a-fA-F]+', text)
+    return int(m.group(), 16) if m else 0
+
+
+def gdb_top_chunk_addr() -> int:
+    """Return the main arena's top chunk address (pwndbg required).
+
+    Uses pwndbg's heap Python API so the result is a clean integer, not a
+    parsed table. Returns 0 if the heap isn't initialized or pwndbg is absent.
+    """
+    out = gdb_cmd("py print(hex(pwndbg.aglib.heap.current.main_arena.top))",
+                  quiet=True)
+    addr = _parse_hex_int(out)
+    if addr:
+        log_ex("top chunk addr: {}".format(hex(addr)))
+    return addr
+
+
+def gdb_heap_base() -> int:
+    """Return the main arena's heap base address (pwndbg required).
+
+    Returns the start of the heap region the main arena's top chunk lives in.
+    Returns 0 if unavailable.
+    """
+    out = gdb_cmd(
+        "py print(hex(pwndbg.aglib.heap.current.main_arena.active_heap.start))",
+        quiet=True)
+    addr = _parse_hex_int(out)
+    if addr:
+        log_ex("heap base: {}".format(hex(addr)))
+    return addr
+
+
+def gdb_bins(timeout: float = 15.0) -> str:
+    """Run pwndbg's `bins` and return its output (tcache + all bin lists)."""
+    return gdb_cmd("bins", timeout=timeout, capture_lines=400)
+
+
+def gdb_heap(timeout: float = 20.0) -> str:
+    """Run pwndbg's `heap` and return its output (full chunk list).
+
+    Captures up to 1000 lines of scrollback; very large heaps may still be
+    truncated.
+    """
+    return gdb_cmd("heap", timeout=timeout, capture_lines=1000)
 
 
 # ----------------------------useful function-------------------------
