@@ -41,7 +41,7 @@ def cli(ctx, directory, verbose):
     if install_from_git:
         if not directory:
             directory = os.path.expanduser("~/pwncli")
-        # check directory
+        # 检查目录
         dirpath = pathlib.PosixPath(directory)
         if not dirpath.exists() or not dirpath.is_dir():
             ctx.abort("update-command --> Invalid pwncli directory %s, please specify the correct directory.", directory)

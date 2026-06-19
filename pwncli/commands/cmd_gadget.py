@@ -18,7 +18,7 @@ import click
 from pwn import wget, which
 
 from ..cli import _set_filename, pass_environ
-from ..utils.misc import _Inner_Dict
+from ..utils.core.state import _Inner_Dict
 
 @click.command(name="gadget", short_help="Get all gadgets using ropper and ROPgadget, and then store them in files.")
 @click.argument('filename', type=str, default=None, required=False, nargs=1)
@@ -30,12 +30,12 @@ from ..utils.misc import _Inner_Dict
 @pass_environ
 def cli(ctx, filename, all_gadgets, directory, depth, opcode, verbose):
     """
-    FILENAME: The binary file name.
-    
+    FILENAME: 二进制文件名。
+
     \b
     pwncli gadget ./pwn -d ./gadgets -a -n 20
     pwncli gadget ./pwn -x 015dc3
-    
+
     pwncli g ./pwn -n 10
     """
     if not ctx.verbose:

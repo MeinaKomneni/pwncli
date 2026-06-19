@@ -10,8 +10,9 @@ from pwn import ELF, atexit, context, process, remote, sleep, which
 
 from pwncli.cli import  _set_filename, pass_environ
 
-from ..utils.config import try_get_config_data_by_key
-from ..utils.misc import _get_gdb_plugin_info, _in_tmux, _in_wsl, _Inner_Dict
+from ..utils.core.config import try_get_config_data_by_key
+from ..utils.core.env import _get_gdb_plugin_info, _in_tmux, _in_wsl
+from ..utils.core.state import _Inner_Dict
 
 
 def _set_gdb_type(pwncli_path, gdb_type):
@@ -87,7 +88,7 @@ def __exec_bash_cmd(dirname, cmd):
 
 
 def __process_launch_script(ctx, args):
-    # check
+    # 检查
     scriptpath = args.launch_script
     dirname = os.path.dirname(scriptpath)
     if not os.path.exists(scriptpath) or not os.path.isfile(scriptpath):
@@ -111,7 +112,7 @@ def __process_launch_script(ctx, args):
             continue
         if not statement.startswith("qemu-system"):
             init_cmd += statement + "\n"
-            context.newline = "\r\n" # update newline for qemu-system
+            context.newline = "\r\n" # 为 qemu-system 更新换行符
         else:
             qemu_cmd = statement
 
@@ -132,9 +133,9 @@ def __debug_mode(ctx, args: _Inner_Dict):
         if not which("gdb-multiarch"):
             ctx.abort("qemu-command --> Please install gdb-multiarch first.")
 
-    # if launch_script is specified
+    # 若指定了 launch_script
     if args.launch_script:
-        # args.port = 1234 # default
+        # args.port = 1234 # 默认
         cmd = __process_launch_script(ctx, args)
         ctx.vlog2("qemu-command --> Get qemu cmd: {}".format(cmd))
         process_args = shlex.split(cmd)
@@ -156,7 +157,7 @@ def __debug_mode(ctx, args: _Inner_Dict):
 
     else:
         process_args = []
-        # get file arch info
+        # 获取文件架构信息
         if not args.arch: 
             args.arch = context.binary.arch
         arch = args.arch 
@@ -185,7 +186,7 @@ def __debug_mode(ctx, args: _Inner_Dict):
             args.lib = _arch_usr_map[arch][1]
             ctx.vlog2(
                 "qemu-command --> Set default lib path: {}.".format(args.lib))
-            # find libc
+            # 查找 libc
         if not context.binary.statically_linked:
             libpath = os.path.join(args.lib, "lib")
             usefile = ""
@@ -207,7 +208,7 @@ def __debug_mode(ctx, args: _Inner_Dict):
                 "qemu-command --> Args lib error, path {} not exists.".format(args.lib))
         process_args.append(args.lib)
 
-    # set process
+    # 设置进程
     process_args.append(args.filename)
     ctx.gift['io'] = process(process_args)
     ctx.gift.process_args = process_args.copy()
@@ -239,7 +240,7 @@ def __debug_mode(ctx, args: _Inner_Dict):
     elif args.gnome:
         cmd = "gnome-terminal -- sh -c"
 
-    # parse gdbsecipt and breakpoints
+    # 解析 gdbscript 与断点
     gdb_examine = __parse_gdb_examine(ctx, args)
     if _get_gdb_plugin_info() == "gef" and "qemu-system" not in process_args[0]:
         cmd += " \"gdb-multiarch {} -ex 'set architecture {}' -ex 'gef-remote --qemu-user --qemu-binary {} {} {}' {}\"".format(
@@ -266,7 +267,7 @@ def __remote_mode(ctx, args: _Inner_Dict):
 
 
 def __process_args(ctx, args: _Inner_Dict):
-    # parse
+    # 解析参数
     if not ctx.gift.filename:
         _set_filename(ctx, args['filename'])
     if args['target']:
@@ -306,7 +307,7 @@ def __process_args(ctx, args: _Inner_Dict):
         __debug_mode(ctx, args)
         ctx.gift['debug'] = True
 
-    # from cli, keep interactive
+    # 来自 CLI 时保持交互
     if ctx.cli_mode:
         ctx.gift['io'].interactive()
 
@@ -335,17 +336,17 @@ def __process_args(ctx, args: _Inner_Dict):
 def cli(ctx, filename, target, debug_mode, remote_mode, ip, port, lib, static, launch_script, 
         tmux, wsl, gnome, gdb_type, gdb_breakpoint, gdb_script, no_log, no_stop, verbose, arch):
     """
-    FILENAME: The binary file name.
-    
-    TARGET:  remote_ip:remote_port.
+    FILENAME: 二进制文件名。
+
+    TARGET:  remote_ip:remote_port。
 
     \b
-    Debug mode is default setting, debug with qemu:
+    默认使用 debug 模式，配合 qemu 调试：
         pwncli qemu ./pwn -S --tmux
         pwncli qemu ./pwn -L ./libs --tmux
-    Specify qemu gdb listen port: 
+    指定 qemu gdb 监听端口：
         pwncli qemu ./pwn -L ./libs -S -p 1235
-    Attack remote:
+    攻击远程：
         pwncli qemu ./pwn 127.0.0.1:10001
         pwncli qemu ./pwn -r -i 127.0.0.1 -p 10001
     """

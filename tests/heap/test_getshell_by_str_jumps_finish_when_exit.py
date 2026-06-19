@@ -1,4 +1,4 @@
-"""POC for getshell_by_str_jumps_finish_when_exit (libc 2.24-2.29)
+"""getshell_by_str_jumps_finish_when_exit 的 POC（libc 2.24-2.29）
 
 Technique: Forge IO_FILE with vtable pointing to _IO_str_jumps - 8, so that
 _IO_OVERFLOW calls _IO_str_finish which calls *(vtable+0x18) = system("/bin/sh")
@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pwn import *
-from pwncli.utils.io_file import IO_FILE_plus_struct
+from pwncli.utils.toolkit.io_file import IO_FILE_plus_struct
 from helper import *
 
 context.arch = "amd64"

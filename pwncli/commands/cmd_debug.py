@@ -21,10 +21,13 @@ from pwnlib.gdb import attach, debug as gdb_debug
 from pwnlib.util.safeeval import expr
 
 from ..cli import _set_filename, pass_environ
-from ..utils.cli_misc import (CurrentGadgets, get_current_codebase_addr,
-                                   get_current_libcbase_addr)
-from ..utils.config import try_get_config_data_by_key
-from ..utils.misc import _in_tmux, _in_wsl, ldd_get_libc_path, _Inner_Dict
+from ..utils.runtime.current_gadgets import CurrentGadgets
+from ..utils.runtime.current_session import (get_current_codebase_addr,
+                                     get_current_libcbase_addr)
+from ..utils.core.config import try_get_config_data_by_key
+from ..utils.core.env import _in_tmux, _in_wsl
+from ..utils.core.state import _Inner_Dict
+from ..utils.toolkit.onegadget import ldd_get_libc_path
 
 _NO_TERMINAL = 0
 _USE_TMUX = 1
@@ -62,11 +65,11 @@ def _set_gdb_type(pwncli_path, gdb_type):
 
 def _parse_env(ctx, env: str):
     length = len(env)
-    # little check
+    # 简单检查
     if (("=" not in env) and (':' not in env)) or (length < 3):
         ctx.abort(msg="debug-command --> Env is invalid, no '=' or ':' in envs, check your env input.")
 
-    # use two points
+    # 使用两个点
     res = {}
     key, var = None, None
     groups = re.split(",|;", env)
@@ -100,7 +103,7 @@ def _set_terminal(ctx, p, flag, attach_mode, use_gdb, gdb_type, script, is_file,
         terminal = ['tmux', 'splitw', '-h']
     elif flag & _USE_GNOME_TERMINAL:
         terminal = ["gnome-terminal", "--", "sh", "-c"]
-    # use cmd.exe to launch wt.exe bash.exe ...
+    # 通过 cmd.exe 启动 wt.exe / bash.exe ...
     elif (flag & _USE_OTHER_TERMINALS) and which('cmd.exe'):
         if is_file:
             gdbcmd = " {}\"".format("-x " + gdb_script)
@@ -147,7 +150,7 @@ def _set_terminal(ctx, p, flag, attach_mode, use_gdb, gdb_type, script, is_file,
                 ctx.vlog('debug-command --> Exec os.system({})'.format(cmd_use))
                 os.system(cmd_use)
                 ctx.gift['gdb_obj'] = 1
-                return  # return
+                return  # 返回
             elif attach_mode == 'wsl-wts' and which("wt.exe"):
                 cmd_use = cmd.replace("cmd.exe /c start", "cmd.exe /c").\
                     format(
@@ -155,7 +158,7 @@ def _set_terminal(ctx, p, flag, attach_mode, use_gdb, gdb_type, script, is_file,
                 ctx.vlog('debug-command --> Exec os.system({})'.format(cmd_use))
                 os.system(cmd_use)
                 ctx.gift['gdb_obj'] = 1
-                return  # return
+                return  # 返回
 
             elif attach_mode == 'wsl-o' and which('open-wsl.exe'):
                 terminal = ['open-wsl.exe', '-b',
@@ -196,7 +199,7 @@ def _set_terminal(ctx, p, flag, attach_mode, use_gdb, gdb_type, script, is_file,
     except:
         ctx.verrlog("debug-command --> Catch gdb error.")
     finally:
-        # recover gdbinit file
+        # 恢复 gdbinit 文件
         if gdb_type_res:
             ctx.vlog("debug-command --> Recover gdbinit file.")
             __recover(gdb_type_res[1], gdb_type_res[0])
@@ -204,25 +207,25 @@ def _set_terminal(ctx, p, flag, attach_mode, use_gdb, gdb_type, script, is_file,
 
 def _check_set_value(ctx, filename, argv, env, use_tmux, use_wsl, use_gnome, attach_mode,
                      use_gdb, gdb_type, gdb_breakpoint, gdb_script, pause_before_main, hook_file, hook_function, gdb_tbreakpoint, gdb_method='attach'):
-    # set filename
+    # 设置 filename
     if not ctx.gift.filename:
         _set_filename(
             ctx, filename, msg="debug-command --> Set 'filename': {}".format(filename))
 
-    # filename is required
+    # filename 必填
     if not ctx.gift.filename:
         ctx.abort("debug-command --> No 'filename'!")
     filename = ctx.gift['filename']
     context.binary = filename
     ctx.gift.elf = ELF(filename, checksec=False)
 
-    # set argv
+    # 设置 argv
     if argv:
         argv = argv.strip().split()
     else:
         argv = []
 
-    # detect attach_mode
+    # 探测 attach_mode
     __attachmode_mapping = {
         "t": "tmux",
         "a": "auto",
@@ -247,15 +250,15 @@ def _check_set_value(ctx, filename, argv, env, use_tmux, use_wsl, use_gnome, att
     if attach_mode.startswith('wsl'):
         use_wsl = True
 
-    # check
+    # 检查
     t_flag = _NO_TERMINAL
-    # check tmux
+    # 检查 tmux
     if use_tmux:
         if not _in_tmux():
             ctx.abort(
                 msg="debug-command 'tmux' --> Not in tmux, please launch tmux first!")
         t_flag = _USE_TMUX
-    # check wsl
+    # 检查 wsl
     elif use_wsl:
         if not _in_wsl():
             ctx.abort(
@@ -267,7 +270,7 @@ def _check_set_value(ctx, filename, argv, env, use_tmux, use_wsl, use_gnome, att
                 msg="debug-command 'gnome' --> No gnome-terminal, please install gnome-terminal first!")
         t_flag = _USE_GNOME_TERMINAL
 
-    # process gdb-scripts
+    # 处理 gdb-scripts
     is_file = False
     script = ''
     script_s = ''
@@ -304,19 +307,19 @@ def _check_set_value(ctx, filename, argv, env, use_tmux, use_wsl, use_gnome, att
             script += _pre
             if gb.startswith(('0x', "0X")) or gb.isdecimal():
                 script += ' *({})\n'.format(gb)
-            elif gb.startswith("lb+"): # base is lib.so.6
+            elif gb.startswith("lb+"): # 基址为 lib.so.6
                 script += " *##{}##\n".format(gb[3:])
-            elif gb.startswith(('$rebase(', '$_base(')): # base is Program ELF Base
+            elif gb.startswith(('$rebase(', '$_base(')): # 基址为程序 ELF 基址
                 fi = gb.index('(')
                 bi = gb.index(')')
                 script += " *###{}###\n".format(gb[fi+1: bi])
-            elif gb.startswith('base+'): # base is is Program ELF Base
+            elif gb.startswith('base+'): # 基址为程序 ELF 基址
                 script += " *###{}###\n".format(gb[5:])
-            elif gb.startswith('bin+'): # base is is Program ELF Base
+            elif gb.startswith('bin+'): # 基址为程序 ELF 基址
                 script += " *###{}###\n".format(gb[4:])
-            elif gb.startswith('b+'): # base is is Program ELF Base
+            elif gb.startswith('b+'): # 基址为程序 ELF 基址
                 script += " *###{}###\n".format(gb[2:])
-            elif gb.startswith('+'): # base is is Program ELF Base
+            elif gb.startswith('+'): # 基址为程序 ELF 基址
                 script += " *###{}###\n".format(gb[1:])
             elif "+" in gb:
                 script += " *####{}####\n".format(gb)
@@ -328,7 +331,7 @@ def _check_set_value(ctx, filename, argv, env, use_tmux, use_wsl, use_gnome, att
     
     script = decomp2dbg_statement + script
     script += script_s
-    # if gdb_script is file, then open it
+    # 若 gdb_script 为文件，则打开它
     if is_file:
         tmp_fd, tmp_gdb_script = tempfile.mkstemp(text=True)
         ctx.vlog(
@@ -427,7 +430,7 @@ int %s()
             ctx.verrlog(
                 msg="debug-command 'pause_before_main' --> Cannot find gcc in PATH.")
 
-    # set binary
+    # 设置二进制
     if gdb_method == 'debug':
         ctx.vlog("debug-command --> Using gdb.debug() mode (gdb starts the process)")
     else:
@@ -478,7 +481,7 @@ int %s()
     ctx.vlog(
         'debug-command --> Set process({}, argv={}, env={})'.format(filename, argv, env))
 
-    # set base+XXX breakpoints
+    # 设置 base+XXX 断点
     if "####" in script:
         _pattern = r"####([\d\w\+\-\*/]+)####"
         _script = script
@@ -488,16 +491,16 @@ int %s()
             _sym, _off = _expr.split("+", 1)
             _off = int(expr(_off))
 
-            # libc is always PIE enabled...
+            # libc 总是开启 PIE...
             if _sym in ctx.gift.libc.sym:
-                if ctx.gift.libc.address:  # already have base address
+                if ctx.gift.libc.address:  # 已有基址
                     _result = hex(ctx.gift.libc.sym[_sym] + _off)
                 else:
                     _result = hex(ctx.gift['_libc_base'] +
                                   ctx.gift.libc.sym[_sym] + _off)
 
             elif _sym in ctx.gift.elf.sym:
-                if ctx.gift.elf.pie:  # PIE enabled
+                if ctx.gift.elf.pie:  # 开启 PIE
                     if ctx.gift.elf.address:
                         _result = hex(ctx.gift.elf.sym[_sym] + _off)
                     else:
@@ -511,7 +514,7 @@ int %s()
             _script = _script.replace("####{}####".format(_expr), _result)
         script = _script
 
-    # have program base-format breakpoints
+    # 存在程序基址格式的断点
     if "###" in script:
         if not ctx.gift['elf'].pie:
             ctx.vlog2(
@@ -527,7 +530,7 @@ int %s()
             _script = _script.replace("###{}###".format(_epxr), _result)
         script = _script
 
-    # process libc base breakpoints
+    # 处理 libc 基址断点
     if "##" in script:
         _pattern = r"##([0-9a-fx\+\-\*/]+)##"
         _script = script
@@ -547,7 +550,7 @@ int %s()
             with open(gdb_script, "wt", encoding="utf-8") as _f:
                 _f.write(script)
 
-    # set gdb-type
+    # 设置 gdb-type
     if t_flag == _NO_TERMINAL and gdb_type != "auto":
         if _in_tmux():
             t_flag = _USE_TMUX
@@ -558,7 +561,7 @@ int %s()
             ctx.vlog2(
                 "debug-command --> set 'gdb_type' but not in tmux or in wsl, so set 'use_gdb' True.")
 
-    # set attach-mode 'auto'
+    # 设置 attach-mode 为 'auto'
     if attach_mode == 'auto':
         if t_flag == _USE_TMUX or (_in_tmux() and t_flag != _USE_OTHER_TERMINALS):
             attach_mode = 'tmux'
@@ -574,7 +577,7 @@ int %s()
             attach_mode = 'wsl-b'  # don't know whether bash.exe is correct
 
     if gdb_method == 'debug':
-        # gdb.debug() mode: gdb starts the process and stops at entry point
+        # gdb.debug() 模式：gdb 启动进程并停在入口点
         terminal = None
         if t_flag & _USE_TMUX:
             terminal = ['tmux', 'splitw', '-h']
@@ -603,15 +606,15 @@ int %s()
             if gdb_type_res:
                 __recover(gdb_type_res[1], gdb_type_res[0])
     else:
-        # gdb.attach() mode: attach to running process
+        # gdb.attach() 模式：附加到运行中的进程
         _set_terminal(ctx, ctx.gift['io'], t_flag, attach_mode,
                       use_gdb, gdb_type, script, is_file, gdb_script)
 
     if pause_before_main:
-        pause()  # avoid read from stdin
+        pause()  # 避免从 stdin 读取
         ctx.gift.io.send("X")
 
-    # from cli, keep interactive
+    # 来自 CLI 时保持交互
     if ctx.cli_mode:
         ctx.gift['io'].interactive()
     else:
@@ -646,14 +649,14 @@ int %s()
 def cli(ctx, verbose, filename, argv, env, gdb_tbreakpoint,
         tmux, wsl, gnome, attach_mode, use_gdb, gdb_type, gdb_breakpoint, gdb_script,
         no_log, no_stop, pause_before_main, hook_file, hook_function, gdb_method):
-    """FILENAME: The ELF filename.
+    """FILENAME: ELF 文件路径。
 
     \b
-    CLI mode:
+    CLI 模式：
         pwncli debug ./pwn -t -b malloc -gb 0x400789
         pwncli debug ./pwn -t --env LD_PRELOAD:./libc-2.27.so
         pwncli debug ./pwn -t -M debug -b main
-    Script mode:
+    脚本模式：
         python3 exp.py debug ./pwn -t -b malloc
     """
     ctx.vlog("Welcome to use pwncli-debug command~")
@@ -692,7 +695,7 @@ def cli(ctx, verbose, filename, argv, env, gdb_tbreakpoint,
     args.no_stop = no_stop
     args.gdb_method = gdb_method
 
-    # log verbose info
+    # 记录详细信息
     for k, v in args.items():
         ctx.vlog("debug-command --> Get '{}': {}".format(k, v))
 
@@ -703,7 +706,7 @@ def cli(ctx, verbose, filename, argv, env, gdb_tbreakpoint,
     context.update(log_level=ll)
     ctx.vlog("debug-command --> Set 'context.log_level': {}".format(ll))
 
-    # set value
+    # 设置值
     _check_set_value(ctx, filename, argv, env, tmux, wsl, gnome, attach_mode,
                      use_gdb, gdb_type, gdb_breakpoint, gdb_script, pause_before_main,
                      hook_file, hook_function, gdb_tbreakpoint, gdb_method)

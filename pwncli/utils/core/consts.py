@@ -10,8 +10,8 @@ __all__ = ["Consts"]
 
 
 class Consts:
-    """Common C/Linux constants. Use `Consts.show()` to print all, or
-    access individual values like `Consts.mmap.PROT_EXEC`."""
+    """常用 C/Linux 常量。使用 `Consts.show()` 打印全部，或
+    通过 `Consts.mmap.PROT_EXEC` 这样的方式访问单个值。"""
 
     class mmap:
         """mmap(addr, length, prot, flags, fd, offset)"""
@@ -22,7 +22,7 @@ class Consts:
         PROT_EXEC = 0x4
         PROT_RWX = 0x7
 
-        # flags
+        # 标志
         MAP_SHARED = 0x01
         MAP_PRIVATE = 0x02
         MAP_FIXED = 0x10
@@ -47,7 +47,8 @@ class Consts:
         AT_FDCWD = -100  # 0xffffff9c as signed
 
     class mprotect:
-        """mprotect(addr, len, prot) — prot values same as mmap"""
+        """mprotect(addr, len, prot) — prot 取值同 mmap"""
+        # 保护权限
         PROT_NONE = 0x0
         PROT_READ = 0x1
         PROT_WRITE = 0x2
@@ -55,7 +56,7 @@ class Consts:
         PROT_RWX = 0x7
 
     class signal:
-        """signal numbers"""
+        """信号编号"""
         SIGHUP = 1
         SIGINT = 2
         SIGQUIT = 3
@@ -77,18 +78,18 @@ class Consts:
 
     class socket:
         """socket(domain, type, protocol)"""
-        # domain
+        # 协议族
         AF_UNIX = 1
         AF_INET = 2
         AF_INET6 = 10
 
-        # type
+        # 类型
         SOCK_STREAM = 1
         SOCK_DGRAM = 2
         SOCK_RAW = 3
 
     class clone:
-        """clone flags"""
+        """clone 标志"""
         CLONE_VM = 0x00000100
         CLONE_FS = 0x00000200
         CLONE_FILES = 0x00000400
@@ -98,7 +99,7 @@ class Consts:
         CLONE_NEWPID = 0x20000000
 
     class fcntl:
-        """fcntl commands"""
+        """fcntl 命令"""
         F_DUPFD = 0
         F_GETFD = 1
         F_SETFD = 2
@@ -108,12 +109,12 @@ class Consts:
         FD_CLOEXEC = 1
 
     class ioctl:
-        """common ioctl requests (terminal)"""
+        """常用 ioctl 请求（终端）"""
         TIOCGWINSZ = 0x5413
         TIOCSWINSZ = 0x5414
 
     class prctl:
-        """prctl options (seccomp related)"""
+        """prctl 选项（与 seccomp 相关）"""
         PR_SET_SECCOMP = 22
         PR_SET_NO_NEW_PRIVS = 38
 
@@ -121,7 +122,7 @@ class Consts:
         SECCOMP_MODE_FILTER = 2
 
     class ptrace:
-        """ptrace requests"""
+        """ptrace 请求"""
         PTRACE_TRACEME = 0
         PTRACE_PEEKTEXT = 1
         PTRACE_PEEKDATA = 2
@@ -135,7 +136,7 @@ class Consts:
         PTRACE_DETACH = 17
 
     class syscall:
-        """syscall numbers for i386 / amd64"""
+        """i386 / amd64 的 syscall 编号"""
         class i386:
             RESTART_SYSCALL = 0
             EXIT = 1
@@ -868,11 +869,11 @@ class Consts:
 
     @classmethod
     def show(cls, group=None):
-        """Print all constants or a specific group.
+        """打印全部常量或指定分组。
 
         Args:
-            group: Optional group name (e.g. "mmap", "open", "syscall").
-                   None = all.
+            group: 可选的分组名（如 "mmap"、"open"、"syscall"）。
+                   None 表示全部。
         """
         groups = {k: v for k, v in cls.__dict__.items()
                   if isinstance(v, type) and not k.startswith('_')}

@@ -13,12 +13,12 @@
 __all__ = ["PwncliExit"]
 class PwncliExit(SystemExit):
     """
-    PwncliExit
+    Pwncli 退出异常
     """
     pass
 
 class PwncliTodoException(Exception):
     """
-    TODO Exception
+    TODO 异常
     """
     pass

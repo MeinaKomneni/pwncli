@@ -1,4 +1,4 @@
-"""POC for house_of_Lys_getshell_when_exit_under_2_37 (libc < 2.37)
+"""house_of_Lys_getshell_when_exit_under_2_37 的 POC（libc < 2.37）
 
 Technique: Use _IO_obstack_jumps vtable to call system("/bin/sh") via
 obstack's chunk_free function pointer.
@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pwn import *
-from pwncli.utils.io_file import IO_FILE_plus_struct
+from pwncli.utils.toolkit.io_file import IO_FILE_plus_struct
 from helper import *
 
 context.arch = "amd64"

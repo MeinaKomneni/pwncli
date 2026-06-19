@@ -9,7 +9,7 @@ from .decorates import bomber
 
 __all__ = ["NamedPipePair"]
 
-# FIFO
+# 命名管道（FIFO）
 class NamedPipePair:
     def __init__(self, rpath, wpath, log_level="debug", created=True, deleted=True) -> None:
         self._init_pipe(rpath, created)
@@ -18,7 +18,7 @@ class NamedPipePair:
         self._wpath = wpath
         self._deleted = deleted
         self._log_level = log_level.lower()
-        self._rfd = os.open(rpath, os.O_RDONLY | os.O_NONBLOCK | os.O_NDELAY) # blocked
+        self._rfd = os.open(rpath, os.O_RDONLY | os.O_NONBLOCK | os.O_NDELAY) # 阻塞式
         self._wfd = os.open(wpath, os.O_SYNC | os.O_RDWR)
         if self._log_level == "debug":
             print(click.style("Create FIFO done!", fg="green"))
@@ -37,9 +37,11 @@ class NamedPipePair:
     
     
     def __del__(self):
-        os.close(self._rfd)
-        os.close(self._wfd)
-        if self._deleted:
+        if hasattr(self, "_rfd"):
+            os.close(self._rfd)
+        if hasattr(self, "_wfd"):
+            os.close(self._wfd)
+        if getattr(self, "_deleted", False):
             try:
                 os.remove(self._rpath)
             except:

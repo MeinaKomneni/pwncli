@@ -11,7 +11,7 @@ from typing import List, TypedDict
 import click
 
 from pwncli.cli import pass_environ
-from ..utils.misc import _Inner_Dict
+from ..utils.core.state import _Inner_Dict
 
 def return_self(func):
     @functools.wraps(func)
@@ -52,7 +52,7 @@ class _Tmux:
         if status:
             self.ctx.abort("tmux-command --> Please install tmux to use 'pwncli tmux' command!")
 
-        # Session
+        # 会话
         self._sessions: _Session = _Session()
         self._cwd = os.getcwd()
     
@@ -211,20 +211,20 @@ class _Tmux:
 @pass_environ
 def cli(ctx, verbose, commands, times, panes_per_window, timeout, save_output, attach, kill_after_detach):
     """
-    Execuate command use tmux.
-    
+    使用 tmux 执行命令。
+
     \b
-    For example: pwncli tmux -c "python3 ./exp.py re ./pwn 127.0.0.1 13337" -t 4 -p 4
-    
+    例如：pwncli tmux -c "python3 ./exp.py re ./pwn 127.0.0.1 13337" -t 4 -p 4
+
     \b
-    Execuate 'ls -alh' in four windows:
+    在四个窗口中执行 'ls -alh'：
         pwncli tmux -c "ls -alh" -t 4
-    Execuate 'ls -al' three times, each pane execuate one commnad, three panes in one window:
+    执行 'ls -al' 三次，每个 pane 执行一条命令，三个 pane 合为一个 window：
         pwncli tmux -c "ls -al" -t 3 -p 3
-        pwncli tmux -c "ls -al" -t 3 -p 1 # one pane in one window
-    Execuate 'ls -al' two times, execuate 'date' three times, each pane execuate one commnad, four panes in one window:
+        pwncli tmux -c "ls -al" -t 3 -p 1 # 每个 window 一个 pane
+    执行 'ls -al' 两次、'date' 三次，每个 pane 执行一条命令，四个 pane 合为一个 window：
         pwncli tmux -c "ls -alh" -t 2 -c "date" -t 3 -p 4
-    
+
     """
     if not ctx.verbose:
         ctx.verbose = verbose

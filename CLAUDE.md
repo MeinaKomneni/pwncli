@@ -29,16 +29,18 @@ cd tests && python3 -m pytest . -vv -s --disable-warnings
 
 `CommandsAliasedGroup` auto-discovers commands from `pwncli/commands/cmd_*.py`. Commands support prefix matching (like GDB: `pwncli de` matches `debug`). Each command module exports a `cli` click command.
 
-The `gift` dictionary (defined in `utils/misc.py`) is the shared state bus — CLI commands populate it with `io`, `elf`, `libc`, and script-mode users read from it.
+The `gift` dictionary (defined in `utils/core/state.py`) is the shared state bus — CLI commands populate it with `io`, `elf`, `libc`, and script-mode users read from it.
 
-### Gadget System (utils/gadgetbox.py + utils/cli_misc.py)
+`pwncli/utils/` is layered into three subpackages by role: `core/` (generic foundation, no PWN semantics), `toolkit/` (PWN exploitation primitives, not bound to the current session), `runtime/` (operations on the current `gift` session). Dependency direction is strictly `runtime → toolkit → core`, acyclic.
+
+### Gadget System (utils/toolkit/gadgetbox.py + utils/runtime/current_gadgets.py)
 
 Three gadget box backends with the same `_GadgetBase` interface:
 - `RopgadgetBox` — shells out to ROPgadget
 - `RopperBox` — uses ropper's Python API
 - `ElfGadgetBox` — uses pwntools ELF.search
 
-`CurrentGadgets` (in `cli_misc.py`) is the high-level static API that scripts use. It wraps a gadget box and provides named gadget accessors (`pop_rdi_ret()`, `pop_rdx_ret()`, etc.) plus chain builders (`orw_chain`, `execve_chain`, `mprotect_chain`).
+`CurrentGadgets` (in `runtime/current_gadgets.py`) is the high-level static API that scripts use. It wraps a gadget box and provides named gadget accessors (`pop_rdi_ret()`, `pop_rdx_ret()`, etc.) plus chain builders (`orw_chain`, `execve_chain`, `mprotect_chain`).
 
 Gadget search uses opcode matching. When a simple gadget isn't found, `__try_get_rdx_gadget` falls through alternatives (e.g. `pop rdx; ret` → `pop rdx; pop rbx; ret` → `pop rdx; xor eax, eax; ret` → longer variants). When adding new fallback gadgets, verify that side effects (like `xor eax, eax`) don't clobber registers set earlier in the chain — check all call sites, not just `__inner_chain`.
 

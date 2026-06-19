@@ -15,7 +15,7 @@ import click
 from pwn import context, listen
 
 from ..cli import pass_environ
-from ..utils.misc import _Inner_Dict
+from ..utils.core.state import _Inner_Dict
 
 
 @click.command(name="listen", short_help="Listen on a port and spawn a program when connected.")
@@ -36,7 +36,7 @@ def cli(ctx, listen_one, listen_forever, port, timeout, executable, verbose):
     pwncli listen -l -vv -p 10001 -e /bin/bash # socat tcp-l:10001,fork exec:/bin/bash
 
     pwncli l -l
-    """
+    """  # 监听端口并在连接时派生程序
     ctx.vlog("Welcome to use pwncli-listen command~")
     if not ctx.verbose:
         ctx.verbose = verbose

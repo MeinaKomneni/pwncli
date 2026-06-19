@@ -17,8 +17,8 @@ import click
 from pwn import which, yesno
 
 from pwncli.cli import pass_environ
-from pwncli.utils.config import try_get_config_data_by_key
-from pwncli.utils.misc import _get_elf_arch_info
+from pwncli.utils.core.config import try_get_config_data_by_key
+from pwncli.utils.core.env import _get_elf_arch_info
 
 
 def get_arch_info_from_file(ctx, filepath):
@@ -56,13 +56,13 @@ def _download_from_glibc_all_in_one(ctx, libc_so, archinfo, libc_dirname):
 @click.option('-v', '--verbose', count=True, help="Show more info or not.")
 @pass_environ
 def cli(ctx, filename, libc_version, back_up, filter_string, verbose, libc_so):
-    """FILENAME: ELF executable filename.\n
-    LIBC_VERSION: Libc version.
+    """FILENAME: ELF 可执行文件路径。\n
+    LIBC_VERSION: libc 版本。
 
     \b
     pwncli patchelf ./filename 2.23 -b
 
-    To execute:
+    实际执行：
 
         patchelf --set-interpreter ./ld-2.23.so ./pwn
 
@@ -73,17 +73,17 @@ def cli(ctx, filename, libc_version, back_up, filter_string, verbose, libc_so):
     if verbose:
         ctx.vlog("patchelf-command --> Open 'verbose' mode")
     
-    # libs-dirname
+    # libs 目录名
     libs_dirname = try_get_config_data_by_key(ctx.config_data, "patchelf", "libs_dir")
     if not libs_dirname:
         libs_dirname = os.path.join(os.environ['HOME'],"glibc-all-in-one/libs")
-    
+
     if libs_dirname.startswith("~"):
         libs_dirname = os.path.expanduser(libs_dirname)
-    
+
     libs_dirname = os.path.abspath(os.path.realpath(libs_dirname)).rstrip("/")
-    
-    # check libc_dirname
+
+    # 检查 libc 目录名
     if not os.path.exists(libs_dirname) or not os.path.isdir(libs_dirname):
         ctx.verrlog("patchelf-command --> Libs dir '{}' not exists!".format(libs_dirname))
         if yesno("clone glibc-all-in-one from github?"):
@@ -93,20 +93,20 @@ def cli(ctx, filename, libc_version, back_up, filter_string, verbose, libc_so):
             libs_dirname = os.path.join(os.environ['HOME'],"glibc-all-in-one/libs")
         else:
             sys.exit(1)
-    
+
     if not libs_dirname.endswith("glibc-all-in-one/libs"):
         ctx.abort("patchelf-command --> Unsupported libc_dirname, must end with glibc-all-in-one/libs.")
 
     ctx.vlog("patchelf-command --> Now libs_dirname used is: {}".format(libs_dirname))
 
-    # check file name
+    # 检查文件名
     if not os.path.isfile(os.path.abspath(filename)):
         ctx.abort("patchelf-command --> Filename '{}' error!".format(filename))
-    
-    # check patchelf
+
+    # 检查 patchelf
     if not which('patchelf'):
         ctx.abort("patchelf-command --> Cannot find 'patchelf', please install it first!")
-    
+
     filename = os.path.abspath(filename)
     archinfo = get_arch_info_from_file(ctx, filename)
 
@@ -114,7 +114,7 @@ def cli(ctx, filename, libc_version, back_up, filter_string, verbose, libc_so):
         ctx.vlog2("patchelf-command --> Libc_so is specified, libc_version would be reset.")
         libc_version = _download_from_glibc_all_in_one(ctx, libc_so, archinfo, libs_dirname)
 
-    # check libc_version
+    # 检查 libc_version
     if not re.search(r"^\d\.\d\d$", libc_version):
         ctx.abort("patchelf-command --> Invalid libc_version: {}".format(libc_version))
 
@@ -137,13 +137,13 @@ def cli(ctx, filename, libc_version, back_up, filter_string, verbose, libc_so):
     if not has_versions or len(has_versions) == 0 or libc_version not in has_versions:
         ctx.abort("patchelf-command --> Do not have the libc version of {}, only have {}!".format(libc_version, has_versions))
     
-    # backup first
+    # 先备份
     if back_up:
         cmd = "cp {} {}".format(filename, filename+".bk")
         ctx.vlog("patchelf-command --> Backup file named: {}".format(filename+".bk"))
         os.system(cmd)
     
-    # execute patchelf
+    # 执行 patchelf
     subdirname = subdirs[has_versions.index(libc_version)]
     last_dirname = os.path.join(libs_dirname, subdirname)
     ctx.vlog("patchelf-command --> The dirname of libs using by patchelf: {}".format(last_dirname))

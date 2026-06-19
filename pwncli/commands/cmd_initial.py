@@ -7,7 +7,7 @@ import click
 from pwn import ELF, wget
 
 from ..cli import pass_environ
-from ..utils.misc import _Inner_Dict
+from ..utils.core.state import _Inner_Dict
 
 
 def _is_elf_file(filepath):
@@ -164,10 +164,10 @@ def _download_and_patch(ctx, info):
 
     if info.download:
         # TODO
-        # unstrip first, then download deb
-        # download ld first
+        # 先 unstrip，再下载 deb
+        # 先下载 ld
         # unstrip
-        # download dbg-deb
+        # 下载 dbg-deb
 
         pass
 
@@ -176,7 +176,7 @@ def _download_and_patch(ctx, info):
         curld = "./" + info.ldfile
         curfile = "./" + info.elffile
         if curlibc not in lddoutput or curld not in lddoutput:
-            # backup
+            # 备份
             cmd = "cp {} {}.bk".format(curfile, curfile)
             getstatusoutput(cmd)
             cmd = "patchelf --replace-needed libc.so.6 {} {}".format(

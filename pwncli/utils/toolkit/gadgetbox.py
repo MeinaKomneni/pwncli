@@ -16,7 +16,8 @@ from typing import Dict, List, Union
 
 from pwn import ELF, asm
 
-from .misc import _get_elf_arch_info, errlog_exit, log_ex
+from ..core.env import _get_elf_arch_info
+from ..core.log import errlog_exit, log_ex
 
 __all__ = [
     'RopperOptionType', 'RopperArchType', 
@@ -178,7 +179,7 @@ class RopgadgetBox(_GadgetBase):
                 "RopgadgetBox error! Please install ROPgadget first!")
 
     def add_file(self, name: str, filepath: str, arch: str = None):
-        """arch: i386 or amd64"""
+        """arch: i386 或 amd64"""
         if not arch:
             arch = _get_elf_arch_info(filepath)
 
@@ -229,7 +230,7 @@ class RopgadgetBox(_GadgetBase):
                       search: str,
                       name: str,
                       get_list: bool = False) -> Union[List[int], int]:
-        # preprocess
+        # 预处理
         search_ = search.split(";")
         search_2 = []
         for stat in search_:
@@ -247,7 +248,7 @@ class RopgadgetBox(_GadgetBase):
         for n in name_:
             self._log("search_gadget %r in %r", search, n)
             allgadgets = self.get_allgadgets(n)
-            #print(allgadgets['asm'])
+            #调试输出 allgadgets['asm']
             if search in allgadgets['asm']:
                 res += allgadgets['asm'][search]
 
@@ -293,7 +294,7 @@ class RopgadgetBox(_GadgetBase):
                       opcode: str,
                       name: str,
                       get_list: bool = False) -> Union[List[int], int]:
-        # preprocess
+        # 预处理
         opcode = opcode.strip()
 
         if not name:
@@ -510,10 +511,10 @@ class ElfGadgetBox(_GadgetBase):
     def __init__(self, debug=False):
         super().__init__(debug)
         self.box_name = "elfgadget"
-        self.elfs = dict()  # filename: ELF
+        self.elfs = dict()  # 文件名: ELF
 
     def add_file(self, name: str, filepath: str, arch: str = None):
-        """arch: i386 or amd64"""
+        """arch: i386 或 amd64"""
         if not arch:
             arch = _get_elf_arch_info(filepath)
 

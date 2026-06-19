@@ -1,4 +1,4 @@
-"""POC for house_of_apple2_stack_pivoting_when_exit (libc 2.35, Ubuntu 22.04)
+"""house_of_apple2_stack_pivoting_when_exit 的 POC（libc 2.35, Ubuntu 22.04）
 
 Technique: Overwrite stderr's vtable to _IO_wfile_jumps, forge _wide_data/_codecvt
 to hijack control flow and pivot stack to execute a ROP chain.
@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pwn import *
-from pwncli.utils.io_file import IO_FILE_plus_struct
+from pwncli.utils.toolkit.io_file import IO_FILE_plus_struct
 from helper import *
 
 context.arch = "amd64"

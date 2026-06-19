@@ -20,8 +20,8 @@ from pwn import wget, which
 
 from pwncli.cli import pass_environ
 
-from ..utils.decorates import limit_calls
-from ..utils.misc import one_gadget
+from ..utils.toolkit.decorates import limit_calls
+from ..utils.toolkit.onegadget import one_gadget
 
 
 def generate_cli_exp(ctx, directory):
@@ -393,7 +393,7 @@ gdb-multiarch ./vmlinux \\
         with open(run_sh, "wt", encoding="utf-8") as fp:
             fp.write(newcontent)
     
-    # generate exp.c
+    # 生成 exp.c
     with open("exp.c", "wt", encoding="utf-8") as fp:
         ctx.vlog("template-command --> Generate exp.c.")
         fp.write("""

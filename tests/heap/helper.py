@@ -1,4 +1,4 @@
-"""Common helper for heap POC tests."""
+"""堆 POC 测试的通用辅助函数。"""
 import sys
 import os
 
@@ -28,7 +28,7 @@ def start(version):
 
 
 def leak_libc_base(io, libc):
-    """Get libc base from /proc/pid/maps for POC reliability."""
+    """从 /proc/pid/maps 获取 libc 基址，用于 POC 可靠性。"""
     import time
     time.sleep(0.1)
     pid = io.pid
@@ -39,7 +39,7 @@ def leak_libc_base(io, libc):
     for line in maps.split('\n'):
         if 'libc' in line and 'r-xp 00000000' in line:
             return int(line.split('-')[0], 16)
-    # Fallback: first libc mapping
+    # 回退：首个 libc 映射
     for line in maps.split('\n'):
         if 'libc' in line:
             return int(line.split('-')[0], 16)

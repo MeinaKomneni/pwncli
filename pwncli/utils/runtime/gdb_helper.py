@@ -15,8 +15,8 @@ from subprocess import check_output
 
 from pwnlib.atexit import register
 
-from .decorates import always_success, cache_nonresult, limit_calls
-from .misc import _in_tmux
+from ..toolkit.decorates import always_success, cache_nonresult, limit_calls
+from ..core.env import _in_tmux
 
 __all__ = [
     "kill_gdb",
@@ -49,7 +49,7 @@ def _get_tmux_info():
 
 
 def kill_gdb(gdb_ins):
-    """Kill gdb process."""
+    """杀掉 gdb 进程。"""
     if isinstance(gdb_ins, int):
         os.system("kill -9 {}".format(gdb_ins))
         time.sleep(0.2)
@@ -58,7 +58,7 @@ def kill_gdb(gdb_ins):
 
 
 def execute_cmd_in_gdb(gdb_obj, cmd:str):
-    """Execute commands in gdb, split commands by ';' or \\n."""
+    """在 gdb 中执行命令，按 ';' 或 \\n 分割命令。"""
     cmd = cmd.replace(";", "\n")
     for x in cmd.splitlines():
         if x:
@@ -69,7 +69,7 @@ def execute_cmd_in_gdb(gdb_obj, cmd:str):
             else:
                 gdb_obj.execute(x)
 
-# name: type
+# name: type（成员名: 类型）
 def add_struct_by_member(gdb_obj, struct_name, add_show_cmd=False, *struct_mems, **struct_memskw):
     """
     add_struct_by_member(gdb_obj, "struct student", True, "char *teachers[10]", name="i8 *", id="u64", grade="size_t")
@@ -190,10 +190,10 @@ PwncliShow%s()
         
 
 def set_pie_breakpoints(gdb_obj, offset:int):
-    """Set breakpoints by offset when binary's PIE enabled. Only support for 'pwndbg'."""
+    """当二进制开启 PIE 时按偏移设置断点。仅支持 'pwndbg'。"""
     execute_cmd_in_gdb(gdb_obj, "break *$rebase({})".format(offset))
 
 
 def tele_pie_content(gdb_obj, offset:int, number=10):
-    """Telescope content by offset when binary's PIE enabled. Only support for 'pwndbg'."""
+    """当二进制开启 PIE 时按偏移 telescope 内容。仅支持 'pwndbg'。"""
     execute_cmd_in_gdb(gdb_obj, "telescope $rebase({}) {}".format(offset, number))

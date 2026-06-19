@@ -17,9 +17,9 @@ import click
 from pwn import ELF, context, remote
 
 from pwncli.cli import _set_filename, pass_environ
-from pwncli.utils.cli_misc import CurrentGadgets
-from pwncli.utils.config import try_get_config_data_by_key
-from pwncli.utils.misc import ldd_get_libc_path
+from pwncli.utils.runtime.current_gadgets import CurrentGadgets
+from pwncli.utils.core.config import try_get_config_data_by_key
+from pwncli.utils.toolkit.onegadget import ldd_get_libc_path
 
 
 def do_setproxy(ctx, proxy_mode):
@@ -38,7 +38,7 @@ def do_setproxy(ctx, proxy_mode):
     proxy_setting = data['proxy']
     socks_type = {1:"socks4", 2:"socks5", 3:"http"}
     socks_type2 = dict(zip(socks_type.values(), socks_type.keys()))
-    proxy_type = 2 # sockts5
+    proxy_type = 2 # socks5
     
     if 'type' in proxy_setting:
         proxy_type = proxy_setting['type'].lower()
@@ -60,7 +60,7 @@ def do_setproxy(ctx, proxy_mode):
     proxy_data = (proxy_type, proxy_host, proxy_port, rdns, username, passwd)
     pstr=''
     for k, v in OrderedDict(zip(proxy_descripe, proxy_data[:-1] + ('******',))).items():
-        # make proxy_type pretty
+        # 美化 proxy_type 显示
         if k == "proxy_type":
             v = socks_type[v]
         pstr += '{}: {}  '.format(k, v)
@@ -81,7 +81,7 @@ def do_setproxy(ctx, proxy_mode):
 
 
 def do_remote(ctx, filename, target, ip, port, proxy_mode, tport):
-    # detect filename and target and tport
+    # 探测 filename、target 与 tport
     # f ip port
     if filename and target and tport:
         ip = target
@@ -107,7 +107,7 @@ def do_remote(ctx, filename, target, ip, port, proxy_mode, tport):
         ip, port = target.split(":")
         ip = ip.strip()
         port = int(port)
-    elif ip is None or port is None or len(ip) == 0 or port <= 0: # little check
+    elif ip is None or port is None or len(ip) == 0 or port <= 0: # 简单检查
             ctx.abort("remote-command --> Cannot get the victim host!")
 
     if not ctx.gift.get('filename', None):
@@ -133,7 +133,7 @@ def do_remote(ctx, filename, target, ip, port, proxy_mode, tport):
     else:
         ctx.abort("remote-command --> Cannot get the victim host!")
     
-    # set proxy
+    # 设置代理
     s = do_setproxy(ctx, proxy_mode)
     ctx.gift['ip'] = ip
     ctx.gift['port'] = port
@@ -166,13 +166,13 @@ _proxy_mode_list = ['undefined', 'notset', 'default', 'primitive']
 @click.option('-v', '--verbose', count=True, help="Show more info or not.")
 @pass_environ
 def cli(ctx, filename, target, ip, port, verbose, use_proxy, proxy_mode, no_log, tport):
-    """FILENAME: ELF filename.\n
-    TARGET: Target victim.
+    """FILENAME: ELF 文件路径。\n
+    TARGET: 目标主机。
 
     \b
-    For remote target:
+    远程目标示例：
         pwncli -v remote ./pwn 127.0.0.1:23333 -up --proxy-mode default
-    Or to specify the ip and port:
+    或者显式指定 ip 与端口：
         pwncli -v remote -i 127.0.0.1 -p 23333
     """
     ctx.vlog("Welcome to use pwncli-remote command~")
@@ -184,11 +184,11 @@ def cli(ctx, filename, target, ip, port, verbose, use_proxy, proxy_mode, no_log,
     ctx.vlog("remote-command --> Get 'no-log': {}".format(no_log))
     ctx.gift['remote'] = True
 
-    # set ip from config data
+    # 从配置数据中设置 ip
     if ip is None:
         ip = try_get_config_data_by_key(ctx.config_data, 'remote', 'ip')
 
-    if use_proxy and proxy_mode == "undefined": # set proxy mode in remote from config data
+    if use_proxy and proxy_mode == "undefined": # 从配置数据中设置 remote 的代理模式
         _proxy_mode = try_get_config_data_by_key(ctx.config_data, 'remote', 'proxy_mode')
         if _proxy_mode is not None and _proxy_mode.lower() in _proxy_mode_list[1:]:
             proxy_mode = _proxy_mode.lower()
@@ -199,7 +199,7 @@ def cli(ctx, filename, target, ip, port, verbose, use_proxy, proxy_mode, no_log,
     if proxy_mode != "undefined":
         ctx.vlog("remote-command --> Use proxy, proxy mode: {}".format(proxy_mode))
 
-    # set log level
+    # 设置日志级别
     ll = 'error' if no_log else ctx.gift.context_log_level
     context.update(log_level=ll)
     ctx.vlog("remote-command --> Set 'context.log_level': {}".format(ll))

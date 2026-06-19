@@ -17,12 +17,12 @@ import click
 from pwn import which
 
 from ..cli import AliasedGroup, _set_filename, pass_environ
-from ..utils.misc import _Inner_Dict
+from ..utils.core.state import _Inner_Dict
 
 @click.command(cls=AliasedGroup, name='misc', short_help="Misc of useful sub-commands.")
 @pass_environ
 def cli(ctx):
-    ctx.verbose = 2  # set verbose
+    ctx.verbose = 2  # 设置 verbose
 
 
 @cli.command(name="setgdb", short_help="Copy gdbinit files from and set gdb-scripts for current user.")
@@ -32,7 +32,7 @@ def cli(ctx):
 def copy_gdbinit(ctx, generate_script):
     """
     \b
-    pwncli misc setgdb 
+    pwncli misc setgdb
 
     """
     if sys.platform != "linux":
@@ -61,7 +61,7 @@ def copy_gdbinit(ctx, generate_script):
             os.system("chmod 755 {}".format(_cur_path))
 
 
-# add display struct info
+# 新增显示结构体信息命令
 @cli.command(name="dstruct", short_help="Display struct info by gdb.")
 @click.argument('filename', type=str, default=None, required=False, nargs=1)
 @click.option('-s', '--save-all', "save_all", is_flag=True, show_default=True, help="Save all struct info or not.")
@@ -70,11 +70,11 @@ def copy_gdbinit(ctx, generate_script):
 @pass_environ
 def export_struct_info(ctx, filename, save_all, directory, name):
     """
-    FILENAME: The binary file name.
-    
+    FILENAME: 二进制文件名。
+
     \b
     pwncli misc dstruct ./vmlinux -n cred -n tty_struct
-    
+
     pwncli m d ./vmlinux -s
     """
     _set_filename(ctx, filename)
@@ -90,7 +90,7 @@ def export_struct_info(ctx, filename, save_all, directory, name):
         write_path = os.path.join(
             directory, os.path.basename(filename)+"_struct_info.txt")
 
-    # step 1: get struct info by gdb
+    # 步骤1：通过 gdb 获取结构体信息
     struct_name = []
     with tempfile.NamedTemporaryFile(mode="a+t") as tf:
         # print(tf.name)
@@ -111,7 +111,7 @@ def export_struct_info(ctx, filename, save_all, directory, name):
             ctx.abort(
                 "dstruct-command ---> Invalid name: {}, cannot find this struct.".format(n))
 
-    # default to print all
+    # 默认打印全部
     if len(name) == 0:
         res = input(
             "[*] No struct name is given, display all struct info in {}, continue? [y/n]".format(filename)).strip().lower()
@@ -119,7 +119,7 @@ def export_struct_info(ctx, filename, save_all, directory, name):
             sys.exit(0)
         name = struct_name
 
-    # step 2: show info
+    # 步骤2：显示信息
     with tempfile.NamedTemporaryFile(mode="w+t", suffix=".py") as tf:
         cmd = "gdb -q {} -batch".format(filename)
         if write_path:

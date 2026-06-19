@@ -1,4 +1,4 @@
-"""POC for getshell_from_IO_puts_by_stdout_libc_2_23 (libc 2.23)
+"""getshell_from_IO_puts_by_stdout_libc_2_23 的 POC（libc 2.23）
 
 Technique: Forge _IO_2_1_stdout_ so that IO_puts calls system("/bin/sh")
 through the vtable. In libc 2.23, there's no vtable validation.
@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pwn import *
-from pwncli.utils.io_file import IO_FILE_plus_struct
+from pwncli.utils.toolkit.io_file import IO_FILE_plus_struct
 from helper import *
 
 context.arch = "amd64"

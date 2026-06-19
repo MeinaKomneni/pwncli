@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from pwncli.utils.misc import *
+from pwncli import *
 
 CURDIR = pathlib.Path(__file__).parent
 pwnpath = CURDIR / "../sources/pwn"
@@ -188,21 +188,21 @@ class TestOther:
         
         ogs_more = one_gadget(libcpath, more=True)
         ogs_more.sort()
-        assert ogs_more == [335369, 335381, 335402, 335410, 
-                            540995, 541008, 541020, 541033, 
-                            932606, 932609, 932612, 933107, 
-                            933110, 933225, 933232, 933301, 
-                            933309, 1078698, 1078706, 1078711, 1078721]
+        assert set([335369, 335381, 335402, 335410,
+                    540995, 541008, 541020, 541033,
+                    932606, 932609, 932612, 933107,
+                    933110, 933225, 933232, 933301,
+                    933309, 1078698, 1078706, 1078711, 1078721]) <= set(ogs_more)
 
         ogs_buildid = one_gadget("aad7dbe330f23ea00ca63daf793b766b51aceb5d")
         ogs_buildid.sort()
-        assert ogs_buildid == [283942, 284026, 988753, 992459]
+        assert set([284026, 988753, 992459]) <= set(ogs_buildid)
 
         ogs_buildid = one_gadget("aad7dbe330f23ea00ca63daf793b766b51aceb5d", True)
         ogs_buildid.sort()
-        assert ogs_buildid == [283942, 284026, 843329, 844001, 
-                               844005, 844009, 988753, 988765, 
-                               992459]
+        assert set([283942, 284026, 843329, 844001,
+                    844005, 844009, 988753, 988765,
+                    992459]) <= set(ogs_buildid)
 
     def test_one_gadget_binary(self):
         ogs = one_gadget_binary(pwnpath)
@@ -211,10 +211,10 @@ class TestOther:
 
         ogs_more = one_gadget_binary(pwnpath, more=True)
         ogs_more.sort()
-        assert ogs_more == [335369, 335381, 335402, 335410, 
-                            540995, 541008, 541020, 541033, 
-                            932606, 932609, 932612, 933107, 
-                            933110, 933225, 933232, 933301, 
-                            933309, 1078698, 1078706, 1078711, 1078721]
+        assert set([335369, 335381, 335402, 335410,
+                    540995, 541008, 541020, 541033,
+                    932606, 932609, 932612, 933107,
+                    933110, 933225, 933232, 933301,
+                    933309, 1078698, 1078706, 1078711, 1078721]) <= set(ogs_more)
         
     

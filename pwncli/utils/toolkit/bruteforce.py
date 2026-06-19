@@ -16,7 +16,7 @@ from string import printable
 from pwnlib.util.hashes import *
 from pwnlib.util.iters import bruteforce, mbruteforce
 
-from .misc import errlog_exit
+from ..core.log import errlog_exit
 
 __all__ = [
     "bruteforce_hash",
@@ -32,7 +32,7 @@ _hash_algos = (
     "sha512"
 )
 
-#--------------------hash related----------------------
+#--------------------hash 相关----------------------
 def __inner_bruteforce(hash_algo:str, prefix_str:str, suffix_str: str, check_res_func:typing.Callable, 
         alphabet:str, start_length:int, max_length:int, multithread):
     assert max_length >= start_length
@@ -58,19 +58,19 @@ def __inner_bruteforce(hash_algo:str, prefix_str:str, suffix_str: str, check_res
 
 def bruteforce_hash(hash_algo:str, prefix_str:str, suffix_str: str, check_res_func:typing.Callable, 
         alphabet:str=printable.strip(), start_length:int=4, max_length:int=6):
-    """Bruteforce hash value when prefix string is given, like sha256('eRt<'+?) starts with 000000
+    """在已知前缀字符串时爆破哈希值，如 sha256('eRt<'+?) 以 000000 开头
 
     Args:
-        hash_algo (str): hash algorithm name: [md5, sha1, sha224, sha256, sha384, sha512].
-        prefix_str (str): Prefix string.
-        suffix_str (str): Suffix string.
-        check_res_func (typing.Callable): func to check hash value, like: lambda x: x.startswith('000000').
-        alphabet (str, optional): String used. Defaults to printable.strip().
-        start_length (int, optional): Starting length. Defaults to 4.
-        max_length (int, optional): Max length. Defaults to 6.
+        hash_algo (str): 哈希算法名：[md5, sha1, sha224, sha256, sha384, sha512]。
+        prefix_str (str): 前缀字符串。
+        suffix_str (str): 后缀字符串。
+        check_res_func (typing.Callable): 检查哈希值的函数，如：lambda x: x.startswith('000000')。
+        alphabet (str, optional): 使用的字符集，默认为 printable.strip()。
+        start_length (int, optional): 起始长度，默认为 4。
+        max_length (int, optional): 最大长度，默认为 6。
 
     Returns:
-        str: if not find, return None.
+        str: 未找到则返回 None。
 
     Example:
         >>> res = bruteforce_hash_prefixstr("sha256", "eRt<", "",lambda x: x.startswith("0000"), max_length=4)
@@ -82,22 +82,22 @@ def bruteforce_hash(hash_algo:str, prefix_str:str, suffix_str: str, check_res_fu
     return __inner_bruteforce(hash_algo, prefix_str, suffix_str, check_res_func, alphabet, start_length, max_length, False)
 
 
-def mbruteforce_hash(hash_algo:str, prefix_str:str, suffix_str: str, check_res_func:typing.Callable, 
+def mbruteforce_hash(hash_algo:str, prefix_str:str, suffix_str: str, check_res_func:typing.Callable,
         alphabet:str=printable.strip(), start_length:int=4, max_length:int=6):
-    """Bruteforce hash value when prefix string is given, like sha256('eRt<'+?) starts with 000000
+    """在已知前缀字符串时爆破哈希值，如 sha256('eRt<'+?) 以 000000 开头
 
     Args:
-        hash_algo (str): hash algorithm name: [md5, sha1, sha224, sha256, sha384, sha512].
-        prefix_str (str): Prefix string.
-        suffix_str (str): Suffix string.
-        check_res_func (typing.Callable): func to check hash value, like: lambda x: x.startswith('000000').
-        alphabet (str, optional): String used. Defaults to printable.strip().
-        start_length (int, optional): Starting length. Defaults to 4.
-        max_length (int, optional): Max length. Defaults to 6.
+        hash_algo (str): 哈希算法名：[md5, sha1, sha224, sha256, sha384, sha512]。
+        prefix_str (str): 前缀字符串。
+        suffix_str (str): 后缀字符串。
+        check_res_func (typing.Callable): 检查哈希值的函数，如：lambda x: x.startswith('000000')。
+        alphabet (str, optional): 使用的字符集，默认为 printable.strip()。
+        start_length (int, optional): 起始长度，默认为 4。
+        max_length (int, optional): 最大长度，默认为 6。
 
     Returns:
-        str: if not find, return None.
-    
+        str: 未找到则返回 None。
+
     Example:
         >>> res = mbruteforce_hash_prefixstr("sha256", "eRt<", "", lambda x: x.startswith("000000"), max_length=6)
         >>> res

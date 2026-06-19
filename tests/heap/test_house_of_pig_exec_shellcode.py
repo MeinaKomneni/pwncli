@@ -1,4 +1,4 @@
-"""POC for house_of_pig_exec_shellcode (libc 2.31)
+"""house_of_pig_exec_shellcode 的 POC（libc 2.31）
 
 Technique: Uses _IO_str_jumps overflow to trigger malloc, which allocates from
 tcache poisoned to point to __free_hook - 0x1c0. The gadget at __free_hook
@@ -12,7 +12,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pwn import *
-from pwncli.utils.io_file import IO_FILE_plus_struct
+from pwncli.utils.toolkit.io_file import IO_FILE_plus_struct
 from helper import *
 
 context.arch = "amd64"

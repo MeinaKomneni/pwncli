@@ -135,6 +135,7 @@ test/
 
 .gdb_history
 core
+!pwncli/utils/core/
 .vscode
 
 # agent

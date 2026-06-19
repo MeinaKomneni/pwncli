@@ -1,4 +1,4 @@
-"""POC for house_of_Lys_stack_pivoting_when_exit_between_2_30_and_2_36 (libc 2.30-2.36)
+"""house_of_Lys_stack_pivoting_when_exit_between_2_30_and_2_36 的 POC（libc 2.30-2.36）
 
 Technique: Use _IO_obstack_jumps vtable + magic gadgets to pivot stack
 and execute a ROP chain.
@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pwn import *
-from pwncli.utils.io_file import IO_FILE_plus_struct
+from pwncli.utils.toolkit.io_file import IO_FILE_plus_struct
 from helper import *
 
 context.arch = "amd64"

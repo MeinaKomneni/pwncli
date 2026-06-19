@@ -28,13 +28,13 @@ _check_data_section_ok = lambda data, section: bool(data and data.has_section(se
 
 
 def read_ini(filename:str) -> configparser.ConfigParser:
-    """Read ini file using configerparser with little check
+    """使用 configparser 读取 ini 文件，仅做少量检查
 
     Args:
-        filename (str): Target filepath
+        filename (str): 目标文件路径
 
     Returns:
-        configparser.ConfigParser: Return None if failed
+        configparser.ConfigParser: 失败时返回 None
     """
     if not os.path.exists(filename):
         return None
@@ -46,15 +46,15 @@ def read_ini(filename:str) -> configparser.ConfigParser:
 
 
 def try_get_config_data_by_key(data:configparser.ConfigParser, section:str, key:str) -> str:
-    """Try to get value by section name and option name with little check
+    """根据 section 名和 option 名尝试获取值，仅做少量检查
 
     Args:
-        data (configparser.ConfigParser): Data
-        section (str): Section name
-        key (str): Option name
+        data (configparser.ConfigParser): 数据
+        section (str): section 名
+        key (str): option 名
 
     Returns:
-        str: Value, Return None if error occurs
+        str: 值，出错时返回 None
     """
     if not _check_data_section_ok(data, section):
         return None
@@ -63,11 +63,11 @@ def try_get_config_data_by_key(data:configparser.ConfigParser, section:str, key:
 
 
 def show_config_data_by_section(data:configparser.ConfigParser, section:str):
-    """Print a section's data by section name
+    """根据 section 名打印该 section 的数据
 
     Args:
-        data (configparser.ConfigParser): Data
-        section (str): Section name
+        data (configparser.ConfigParser): 数据
+        section (str): section 名
 
     """
     if not _check_data_section_ok(data, section):
@@ -80,10 +80,10 @@ def show_config_data_by_section(data:configparser.ConfigParser, section:str):
 
 
 def show_config_data_all(data:configparser.ConfigParser):
-    """Show the whole config data
+    """显示全部配置数据
 
     Args:
-        data (configparser.ConfigParser): Data
+        data (configparser.ConfigParser): 数据
 
     """
     if not data:
@@ -93,60 +93,60 @@ def show_config_data_all(data:configparser.ConfigParser):
 
 
 def show_config_data_file(filename:str):
-    """Show the whole config data
+    """显示全部配置数据
 
     Args:
-        filename (str): Config data file path
-    
+        filename (str): 配置数据文件路径
+
     """
     show_config_data_all(read_ini(filename))
 
 
 def set_config_data_by_section(data:configparser.ConfigParser, section:str, **content):
-    """Set a section's content of config-data with little check
+    """设置配置数据中某个 section 的内容，仅做少量检查
 
     Args:
-        data (configparser.ConfigParser): Data
-        section (str): Section name
-        content (dict): Content to set
+        data (configparser.ConfigParser): 数据
+        section (str): section 名
+        content (dict): 待设置的内容
 
     """
     section = str(section)
     if not _check_data_section_ok(data, section):
         return None
-    
-    # guarantee type of key and value is str
+
+    # 保证 key 与 value 的类型为 str
     for k, v in content.items():
         data[section][str(k)] = str(v)
     
 
 def set_config_data_by_key(data:configparser.ConfigParser, section:str, key:str, value:str):
-    """Set option value in a section of a config-data with little check
+    """设置配置数据中某个 section 的 option 值，仅做少量检查
 
     Args:
-        data (configparser.ConfigParser): Data
-        section (str): Section name
-        key (str): Option name
-        value (str): Value to set
+        data (configparser.ConfigParser): 数据
+        section (str): section 名
+        key (str): option 名
+        value (str): 待设置的值
 
     """
     section = str(section)
     if not _check_data_section_ok(data, section):
         return None
-    
-    # guarantee type of key and value is str
+
+    # 保证 key 与 value 的类型为 str
     data[section][str(key)] = str(value)
 
 
 def write_config_data(data:configparser.ConfigParser, filepath:str="~/.pwncli.conf") -> bool:
-    """Write data to file
+    """将数据写入文件
 
     Args:
-        data (configparser.ConfigParser): Data
-        filepath (str, optional): The target file path. Defaults to "~/.pwncli.conf".
+        data (configparser.ConfigParser): 数据
+        filepath (str, optional): 目标文件路径，默认为 "~/.pwncli.conf"。
 
     Returns:
-        bool: whether the writting is successful
+        bool: 写入是否成功
     """
     if not data:
         return False

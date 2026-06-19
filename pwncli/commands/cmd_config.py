@@ -14,7 +14,7 @@ import sys
 import click
 
 from pwncli.cli import AliasedGroup, pass_environ
-from pwncli.utils.config import *
+from pwncli.utils.core.config import *
 
 
 @click.command(cls=AliasedGroup, name='config', short_help="Get or set something about config data.")
@@ -29,7 +29,7 @@ def cli(ctx):
 @click.option('-s', '-sn', '--section-name', default=[], type=str, multiple=True, show_default=True, help="List config data by section name.")
 @pass_environ
 def list_config(ctx, listdata, section_name):
-    """LISTDATA: List all data or example data or section names.
+    """LISTDATA: 列出全部数据、示例数据或 section 名称。
     """
     if listdata is None and len(section_name) == 0:
         ctx.vlog2("Use `pwncli config list all/example/section config data")

@@ -20,19 +20,20 @@ from time import sleep, time
 import requests
 
 from .gadgetbox import ElfGadgetBox, RopgadgetBox, RopperBox
-from .misc import errlog_exit, log_ex, one_gadget
+from ..core.log import errlog_exit, log_ex
+from .onegadget import one_gadget
 
 __all__ = ["LibcBox"]
 
 class LibcBox:
     def __init__(self, search_url="https://libc.rip/api/find", debug=False, wait_time=45):
-        self._data = dict() # post data, is a dict
-        self._res = None # post res, is a dict
+        self._data = dict() # post 数据，为 dict
+        self._res = None # post 结果，为 dict
         self._symbols = None
         self._call_searcher = False
         self._downloaded = False
 
-        self.debug = debug # open debug or not
+        self.debug = debug # 是否开启调试
         self._wait_time = wait_time
         self._search_url = search_url
         self._search_url_list = ["https://libc.roderickchan.cn/api/find", "https://libc.rip/api/find"]
@@ -257,8 +258,8 @@ class LibcBox:
 
 
     def reset(self):
-        self._data = dict() # post data, is a dict
-        self._res = None # post res, is a dict
+        self._data = dict() # post 数据，为 dict
+        self._res = None # post 结果，为 dict
         self._symbols = None
         self._call_searcher = False
 
@@ -301,16 +302,16 @@ class LibcBox:
 
     
     def search(self, *, download_symbols=False, download_so=False, download_deb=False, redownload=False, version_start="2.23", load_gadgets=False, wait_=False):
-        """search symbol
+        """搜索符号
 
         Args:
-            download_symbols (bool, optional): download symbol file in current directory or not. Defaults to False.
-            download_so (bool, optional): download so file in current directory or not. Defaults to False.
-            download_deb (bool, optional): download so file in current directory or not. Defaults to False.
-            redownload (bool, optional): redownload even though file exists in current directory. Defaults to False.
-            version_start (str, optional): libc version. Defaults to "2.23", no versio control when set None.
-            load_gadgets (bool, optional): load gadgets using RopperBox. Defaults to False.
-            wait_ (bool, optional): wait for download or not. Defaults to False.
+            download_symbols (bool, optional): 是否将符号文件下载到当前目录，默认为 False。
+            download_so (bool, optional): 是否将 so 文件下载到当前目录，默认为 False。
+            download_deb (bool, optional): 是否将 so 文件下载到当前目录，默认为 False。
+            redownload (bool, optional): 即使当前目录已存在文件也重新下载，默认为 False。
+            version_start (str, optional): libc 版本，默认为 "2.23"，设为 None 时不做版本限制。
+            load_gadgets (bool, optional): 使用 RopperBox 加载 gadget，默认为 False。
+            wait_ (bool, optional): 是否等待下载完成，默认为 False。
         """
         if not self._data:
             errlog_exit("No condition! Please add condition first!")
