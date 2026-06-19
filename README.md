@@ -18,6 +18,10 @@
   - [patchelf 子命令](#patchelf-子命令)
   - [qemu 子命令](#qemu-子命令)
   - [template 子命令](#template-子命令)
+  - [initial 子命令](#initial-子命令)
+  - [listen 子命令](#listen-子命令)
+  - [tmux 子命令](#tmux-子命令)
+  - [update 子命令](#update-子命令)
 - [依赖库](#依赖库)
 - [截图示例](#截图示例)
     - [pwncli 示例](#pwncli-示例)
@@ -68,12 +72,17 @@ pwncli
     debug
     dstruct
     gadget
-    setgdb
+    initial
+    listen
     patchelf
     qemu
     remote
+    setgdb
+    template
+    tmux
+    update
 ```
-其中，`pwncli`为主命令，`config/debug/dstruct/gadget/patchelf/qemu/remote/setgdb`等为一级子命令，`list/set`为隶属`config`的二级子命令。
+其中，`pwncli`为主命令，`config/debug/dstruct/gadget/initial/listen/patchelf/qemu/remote/setgdb/template/tmux/update`等为一级子命令，`list/set`为隶属`config`的二级子命令。
 
 `pwncli`支持命令的前缀匹配(与`gdb`的命令前缀匹配类似)，通常只需要给出命令的前缀即可成功调用该命令。即输入`pwncli debug ./pwn`、`pwncli de ./pwn`和`pwncli d ./pwn`的执行效果是完全一样的。但是，必须保证前缀不会匹配到两个或多个子命令，否则将会抛出`MatchError`的匹配错误。 
 
@@ -235,7 +244,7 @@ all_ogs = get_current_one_gadget_from_libc()
 # sendline
 sl("data")
 # sendafter
-sa("\n", "data)
+sa("\n", "data")
 
 
 # 直接使用当前gadget
@@ -361,34 +370,41 @@ ia()
 ```
 Usage: pwncli [OPTIONS] COMMAND [ARGS]...
 
-  pwncli tools for pwner!
+  pwncli —— 面向 pwner 的工具！
 
-  For cli:
+  CLI 用法：
       pwncli -v subcommand args
-  For python script:
-      script content:
+  Python 脚本用法：
+      脚本内容：
           from pwncli import *
           cli_script()
-      then start from cli: 
+      然后从命令行启动：
           ./yourownscript -v subcommand args
 
 Options:
-  -f, --filename TEXT  Elf file path to pwn.
-  -v, --verbose        Show more info or not.
-  -V, --version        Show the version and exit.
-  -h, --help           Show this message and exit.
+  -f, --filename TEXT         Elf file path to pwn.
+  -v, --verbose               Show more info or not.
+  -E, -ea, --extra-argv TEXT  The extra argv for this script, sometimes it's
+                              useful for bruteforce.  [default: ""]
+  -V, --version               Show the version and exit.
+  -h, --help                  Show this message and exit.
 
 Commands:
   config    Get or set something about config data.
   debug     Debug the pwn file locally.
   dstruct   Display struct info by gdb.
-  gadget    Get all gadgets using ropper and ROPgadget, and then store them
-            in files.
-  setgdb    Copy gdbinit files from and set gdb-scripts for current user.
-  patchelf  Patchelf executable file using glibc-all-in-one.
+  example   Example command.
+  gadget    Get all gadgets using ropper and ROPgadget, and then store them in
+            files.
+  initial   pwn initial tool, inspired by https://github.com/io12/pwninit.
+  listen    Listen on a port and spawn a program when connected.
+  patchelf  Patchelf executable file with glibc-all-in-one.
   qemu      Use qemu to debug pwn, for kernel pwn or arm/mips arch.
   remote    Pwn remote host.
-  test      Test command.
+  setgdb    Copy gdbinit files from and set gdb-scripts for current user.
+  template  Generate template file by pwncli.
+  tmux      Use tmux to execuate command many times.
+  update    Update pwncli.
 ```
 
 **选项**：
@@ -396,6 +412,7 @@ Commands:
 ```
 -f  可选的  待调试的pwn文件路径，如./pwn，在这里指定后，debug/remote子命令中可无需指定。
 -v  可选的  flag选项，默认关闭。开启后将显示log信息，如果需要显示更多信息，可以输入-vv。
+-E  可选的  传递给脚本的额外参数，爆破场景下偶尔有用，默认为空字符串。
 -V         查看版本信息。
 -h         查看帮助。
 ```
@@ -403,15 +420,20 @@ Commands:
 **命令**(即`pwncli`下拥有的子命令)：
 
 ```
-config     操作pwncli配置文件，配置文件路径为~/./pwncli.conf。
+config     操作pwncli配置文件，配置文件路径为~/.pwncli.conf。
 debug      最常用的子命令，用于本地调试pwn题。
 dstruct    通过gdb提取并展示二进制文件中的结构体信息。
+example    示例命令，演示如何编写子命令，无实际用途。
 gadget     使用ropper和ROPgadget工具获取所有的gadgets，并将其存储在本地。
-setgdb     将pwncli/conf/.gdbinit-xxx的配置文件拷贝到家目录。
+initial    受pwninit启发的初始化工具，自动补齐文件、解压、patchelf等。
+listen     监听端口，连接到达后拉起指定程序，便于本地起题。
 patchelf   快速地执行patchelf，以用于调试不同版本的glibc。
 qemu       使用qemu调试pwn题，用于kernel pwn或其他架构的pwn。
 remote     最常用的子命令，用于远程攻击靶机。
-test       测试命令，无其他用途。
+setgdb     将pwncli/conf/.gdbinit-xxx的配置文件拷贝到家目录。
+template   生成各类攻击模板脚本。
+tmux       利用tmux在多个pane/window中重复执行命令，便于爆破。
+update     执行git pull更新pwncli。
 ```
 
 ## debug 子命令
@@ -420,47 +442,57 @@ test       测试命令，无其他用途。
 ```
 Usage: pwncli debug [OPTIONS] [FILENAME]
 
-  FILENAME: The ELF filename.
+  FILENAME: ELF 文件路径。
 
-  Debug in tmux:
-      python3 exp.py debug ./pwn --tmux --gdb-breakpoint malloc -gb 0x400789
+  CLI 模式：
+      pwncli debug ./pwn -t -b malloc -gb 0x400789
+      pwncli debug ./pwn -t --env LD_PRELOAD:./libc-2.27.so
+      pwncli debug ./pwn -t -M debug -b main
+  脚本模式：
+      python3 exp.py debug ./pwn -t -b malloc
 
 Options:
-  --argv TEXT                     Argv for process.
+  -a, --argv TEXT                 Argv for process.
   -e, --set-env, --env TEXT       The env setting for process, such as
                                   LD_PRELOAD setting, split using ',' or ';',
-                                  assign using '=' or ':'.
+                                  assign using ':'.
   -p, --pause, --pause-before-main
                                   Pause before main is called or not, which is
-                                  helpful for gdb attach.  [default: False]
+                                  helpful for gdb attach.
   -f, -hf, --hook-file TEXT       Specify a hook.c file, where you write some
                                   functions to hook.
   -H, -HF, --hook-function TEXT   The functions you want to hook would be out
                                   of work.
-  -t, --use-tmux, --tmux          Use tmux to gdb-debug or not.  [default:
-                                  False]
+  -t, --use-tmux, --tmux          Use tmux to gdb-debug or not.
   -w, --use-wsl, --wsl            Use wsl to pop up windows for gdb-debug or
-                                  not.  [default: False]
-  -m, -am, --attach-mode [auto|tmux|wsl-b|wsl-u|wsl-o|wsl-wt|wsl-wts]
+                                  not.
+  -g, --use-gnome, --gnome        Use gnome terminal to pop up windows for
+                                  gdb-debug or not.
+  -m, -am, --attach-mode [auto|tmux|wsl-b|wsl-u|wsl-o|wsl-wt|wsl-wts|wsl-w|a|t|w|wt|wts|b|o|u]
                                   Gdb attach mode, wsl: bash.exe | wsl:
                                   ubuntu1x04.exe | wsl: open-wsl.exe | wsl:
                                   wt.exe wsl.exe  [default: auto]
-  -u, -ug, --use-gdb              Use gdb possibly.  [default: False]
-  -g, -gt, --gdb-type [auto|pwndbg|gef|peda]
+  -u, -ug, --use-gdb              Use gdb possibly.
+  -G, -gt, --gdb-type [auto|pwndbg|gef|peda]
                                   Select a gdb plugin.
-  -b, -gb, --gdb-breakpoint TEXT  Set gdb breakpoints while gdb-debug is used,
-                                  it should be a hex address or '\$rebase'
-                                  addr or a function name. Multiple
-                                  breakpoints are supported.
+  -b, -gb, --gdb-breakpoint TEXT  Set gdb breakpoints while gdb is used.
+                                  Multiple breakpoints are supported.
+  -T, -tb, --gdb-tbreakpoint TEXT
+                                  Set gdb temporary breakpoints while gdb is
+                                  used. Multiple tbreakpoints are supported.
   -s, -gs, --gdb-script TEXT      Set gdb commands like '-ex' or '-x' while
                                   gdb-debug is used, the content will be
                                   passed to gdb and use ';' to split lines.
                                   Besides eval-commands, file path is
                                   supported.
-  -n, -nl, --no-log               Disable context.log or not.  [default:
-                                  False]
+  -n, -nl, --no-log               Disable context.log or not.
   -P, -ns, --no-stop              Use the 'stop' function or not. Only for
-                                  python script mode.  [default: False]
+                                  python script mode.
+  -M, --gdb-method [attach|debug]
+                                  Use gdb.attach() or gdb.debug(). 'debug'
+                                  lets gdb start the process, stopping at
+                                  entry — easier to break on main.  [default:
+                                  attach]
   -v, --verbose                   Show more info or not.
   -h, --help                      Show this message and exit.
 ```
@@ -476,20 +508,23 @@ FILENAME  可选的  本地调试的pwn文件路径，还可以在pwncli主命�
 **选项**：
 
 ```
---argv  可选的  	除文件路径，传递给process构造函数的参数。
--e		可选的		设置启动的环境变量，如LD_PRELOAD=./libc.so.6;PORT_ENV:1234,IP_ADDR=localhost，数据将传递给process构造函数的env参数。环境变量会统一转换为大写。LD_PRELOAD可以简写为PRE=./libc.so.6。
--p		可选的		flag选项，开启gdb后生效，默认关闭。开启后将在main函数之前执行一个getchar()函数，方便gdb attach上去调试，避免有时候gdb.attach失败的问题。本质上是编译生成一个so文件，并将其设置为LD_PRELOAD环境变量，在init段执行getchar函数。
+-a		可选的		除文件路径外，传递给process构造函数的参数。
+-e		可选的		设置启动的环境变量，如LD_PRELOAD:./libc.so.6;PORT_ENV:1234,IP_ADDR=localhost，数据将传递给process构造函数的env参数。环境变量会统一转换为大写。LD_PRELOAD可以简写为PRE:./libc.so.6。
+-p		可选的		flag选项，开启gdb后生效，默认关闭。开启后将在main函数之前卡住进程，方便gdb attach上去调试，避免有时候gdb.attach失败的问题。本质上是编译生成一个so文件，并将其设置为LD_PRELOAD环境变量，在init段执行一个read系统调用阻塞。
 -f		可选的		开启gdb后生效，自己定义的hook.c文件，该文件会被编译为so，并设置为LD_PRELOAD环境变量。
--H		可选的		多选的，开启gdb后生效。选择要hook的函数名，如alarm函数，被hook的函数将直接返回0，支持多个选项，即可以 -H alarm -H ptrace。
+-H		可选的		多选的，开启gdb后生效。选择要hook的函数名，如alarm函数，被hook的函数将直接返回0，支持多个选项，即可以 -H alarm -H ptrace。需要指定返回值时用:或=跟在函数名后，如 -H ptrace:0 -H getuid=1000。
 -t		可选的		flag选项，默认关闭。开启后使用tmux开启gdb，并使用竖屏分屏。开启前必须保证在tmux环境中，否则会报错。
 -w		可选的		flag选项，默认关闭。开启后使用wsl模式开启gdb，弹窗口调试。开启前必须保证在wsl的发行版环境中，否则会报错。
+-g		可选的		flag选项，默认关闭。开启后使用gnome-terminal弹窗调试。
 -m		可选的		开启gdb后生效，默认为auto。指定开启gdb的调试模式。auto：自动选择；tmux：开启-t后生效；wsl-b：开启-w后生效，使用bash.exe弹窗；wsl-u：开启-w后生效，使用ubuntu1x04.exe弹窗，前提是将其加入到windows宿主机的PATH环境变量中；wsl-o：开启-w后生效，使用open-wsl.exe弹窗，须到https://github.com/mskyaxl/wsl-terminal下载并将其加入到windows的PATH环境变量中；wsl-wt：开启-w后生效，使用windows-terminal弹窗，需安装windows terminal；wsl-wts：开启-w后生效，使用windows terminal分屏调试，需保证其版本至少为1.11.3471.0。
 -u		可选的		flag选项，默认关闭。开启后会尽可能的使用gdb调试。
--g		可选的		开启gdb后生效，默认为auto。选择gdb插件类型。使用的前提是将gef、peda、pwndbg均安装在家目录下。auto：使用~/.gdbinit的配置，否则使用pwncli/conf/.gdbinit-xxx的配置。
--b		可选的		多选的，开启gdb后生效。在gdb中设置断点。支持设置的方式有三种：1)函数地址，-b 0x401020或-b 4198432；2)函数名，-b malloc；3)相对于PIE基址的偏移，适用于开启PIE的场景，-b base+0x4f0或-b b+0x4f0或-b \$rebase(0x4f0)或-b \$_base(0x4f0)，只支持gef和pwndbg插件。支持设置多个断点，如-b malloc -b 0x401020。
--s		可选的		开启gdb后生效。可以是文件路径或者语句。如果是语句，设置后将在gdb中执行，每个子语句之间使用分号;分割，如-s "directory /usr/src/glibc/glibc-2.27/malloc;b malloc";如果是文件路径，则会在gdb中依次执行文件内的每一行语句。
+-G		可选的		开启gdb后生效，默认为auto。选择gdb插件类型。使用的前提是将gef、peda、pwndbg均安装在家目录下。auto：使用~/.gdbinit的配置，否则使用pwncli/conf/.gdbinit-xxx的配置。指定非auto插件时会临时替换~/.gdbinit，调试结束自动还原。
+-b		可选的		多选的，开启gdb后生效。在gdb中设置断点。支持函数地址（-b 0x401020）、函数名（-b malloc）、PIE基址偏移（-b base+0x4f0 / -b b+0x4f0 / -b $rebase(0x4f0) / -b +0x4f0）、libc基址偏移（-b lb+0x4f322）以及符号加偏移（-b system+0x10）等多种写法。可设置多个断点，如-b malloc -b 0x401020。
+-T		可选的		多选的，开启gdb后生效。设置临时断点，命中一次后自动删除，写法与-b一致。
+-s		可选的		开启gdb后生效。可以是文件路径或者语句。如果是语句，设置后将在gdb中执行，每个子语句之间使用分号;分割，如-s "directory /usr/src/glibc/glibc-2.27/malloc;b malloc";如果是文件路径，则会在gdb中依次执行文件内的每一行语句。命令串里以b 开头的行会被识别成断点，并入-b处理流程，因此同样支持上述基址前缀语法。
 -n		可选的		flag选项，默认关闭。设置pwntools为无log信息。若开启该选项，则会关闭pwntools的log。
 -P		可选的		flag选项，默认关闭。设置stop函数失效。stop函数会等待输入并打印出当前信息，方便gdb调试。开启此选项后stop函数将失效。
+-M		可选的		默认为attach。决定底层使用gdb.attach()还是gdb.debug()。attach：先启动进程再让gdb附加，为默认行为；debug：由gdb直接拉起进程并停在入口点，更容易在main上断下来。
 -v		可选的		flag选项，默认关闭。开启后将显示log信息，如果需要显示更多信息，可以输入-vv。
 -h		可选的		查看帮助。
 ```
@@ -501,21 +536,21 @@ FILENAME  可选的  本地调试的pwn文件路径，还可以在pwncli主命�
 输入`pwncli remote -h`得到以下帮助：
 
 ```
-Usage: pwncli remote [OPTIONS] [FILENAME] [TARGET]
+Usage: pwncli remote [OPTIONS] [FILENAME] [TARGET] [TPORT]
 
-  FILENAME: ELF filename.
+  FILENAME: ELF 文件路径。
 
-  TARGET: Target victim.
+  TARGET: 目标主机。
 
-  For remote target:
+  远程目标示例：
       pwncli -v remote ./pwn 127.0.0.1:23333 -up --proxy-mode default
-  Or to specify the ip and port:
+  或者显式指定 ip 与端口：
       pwncli -v remote -i 127.0.0.1 -p 23333
 
 Options:
   -i, --ip TEXT                   The remote ip addr.
   -p, --port INTEGER              The remote port.
-  -P, -up, --use-proxy            Use proxy or not.  [default: False]
+  -P, -up, --use-proxy            Use proxy or not.
   -m, -pm, --proxy-mode [undefined|notset|default|primitive]
                                   Set proxy mode. undefined: read proxy data
                                   from config data(do not set this type in
@@ -523,8 +558,7 @@ Options:
                                   pwntools context proxy; primitive: pure
                                   socks connection proxy.  [default:
                                   undefined]
-  -n, -nl, --no-log               Disable context.log or not.  [default:
-                                  False]
+  -n, -nl, --no-log               Disable context.log or not.
   -v, --verbose                   Show more info or not.
   -h, --help                      Show this message and exit.
 ```
@@ -536,6 +570,7 @@ Options:
 ```
 FILENAME	可选的		本地调试的pwn文件路径，还可以在pwncli主命令中通过-f选项设置；设置后将不需要手动设置context.arch、context.os等信息。
 TARGET		可选的		目标靶机；如果不用-i和-p参数，则必须指定。格式为：ip:port，如127.0.0.1:1234。
+TPORT		可选的		目标靶机端口；当TARGET未带端口时可单独给出，等价于-p。
 ```
 
 **选项**：
@@ -639,17 +674,26 @@ CLAUSE	必须的		设置的语句，格式为key=value。
 ```
 Usage: pwncli gadget [OPTIONS] [FILENAME]
 
+  FILENAME: 二进制文件名。
+
+  pwncli gadget ./pwn -d ./gadgets -a -n 20
+  pwncli gadget ./pwn -x 015dc3
+
+  pwncli g ./pwn -n 10
+
 Options:
-  -a, --all, --all-gadgets     Get all gadgets and don't remove duplicates.
-                               [default: False]
-  -d, --dir, --directory TEXT  The directory to save files.
-  -h, --help                   Show this message and exit.
+  -a, --all, --all-gadgets      Get all gadgets and don't remove duplicates.
+  -d, --dir, --directory PATH   The directory to save files.
+  -x, --opcode TEXT             The opcode mode.
+  -n, --depth, --count INTEGER  The depth of the gadgets.
+  -v, --verbose                 Show more info or not.
+  -h, --help                    Show this message and exit.
 ```
 
 **参数**：
 
 ```
-FILENAME	必须的		要获取gadgets的binary路径。
+FILENAME	可选的		要获取gadgets的binary路径。
 ```
 
 **选项**：
@@ -657,6 +701,9 @@ FILENAME	必须的		要获取gadgets的binary路径。
 ```
 -a		可选的		flag选项，默认关闭。开启后将不会移除重复的gadgets。
 -d		可选的		保存gadgets文件的路径。若未指定则为当前目录。
+-x		可选的		opcode模式，直接按opcode搜索，如-x 015dc3。
+-n		可选的		搜索gadget的深度/数量。
+-v		可选的		flag选项，开启后显示更多日志。
 -h		查看帮助。
 ```
 
@@ -730,25 +777,35 @@ FILENAME	可选的		要提取结构体信息的binary路径。
 输入`pwncli patchelf -h`得到帮助信息：
 
 ```
-Usage: pwncli patchelf [OPTIONS] FILENAME LIBC_VERSION
+Usage: pwncli patchelf [OPTIONS] FILENAME [LIBC_VERSION]
 
-  FILENAME: ELF executable filename.
+  FILENAME: ELF 可执行文件路径。
 
-  LIBC_VERSION: Libc version.
+  LIBC_VERSION: libc 版本。
 
-  pwncli patchelf ./filename 2.29 -b
+  pwncli patchelf ./filename 2.23 -b
+
+  实际执行：
+
+      patchelf --set-interpreter ./ld-2.23.so ./pwn
+
+      patchelf --replace-needed libc.so.6 ./libc-2.23.so ./pwn
 
 Options:
   -b, --back, --back-up           Backup target file or not.
   -f, --filter, --filter-string TEXT
                                   Add filter condition.
+  -s, -l, --libc-so PATH          The libc.so.6 file, libc_version will be
+                                  ignored when libc.so.6 file specified.
+  -v, --verbose                   Show more info or not.
   -h, --help                      Show this message and exit.
 ```
 
 **参数**：
 
 ```
-FILENAME	必须的		待patch的文件路径。
+FILENAME		必须的		待patch的文件路径。
+LIBC_VERSION	可选的		libc版本，如2.23。指定-s/--libc-so直接给出libc文件时该项将被忽略。
 ```
 
 **选项**：
@@ -756,6 +813,8 @@ FILENAME	必须的		待patch的文件路径。
 ```
 -b		可选的		flag选项，默认关闭。开启后将备份一份文件后再执行patchelf命令，建议开启。
 -f		可选的		过滤器，设置过滤条件。如-f 2.23，则会匹配到2.23版本的glibc库。
+-s		可选的		直接指定libc.so.6文件路径，给出后LIBC_VERSION被忽略，同时会尝试在同目录寻找对应的ld。
+-v		可选的		flag选项，开启后显示更多日志。
 -h		查看帮助。
 ```
 
@@ -782,6 +841,7 @@ Usage: pwncli qemu [OPTIONS] [FILENAME] [TARGET]
       pwncli qemu ./pwn -r -i 127.0.0.1 -p 10001
 
 Options:
+  -a, --arch TEXT                 The arch for current file.
   -d, --debug, --debug-mode       Use debug mode or not, default is opened.
   -r, --remote, --remote-mode     Use remote mode or not, default is debug
                                   mode.  [default: False]
@@ -822,14 +882,15 @@ Options:
 **参数**：
 
 ```
-FILENAME    可选的    调试的binary文件路径，kernel pwn可以是ko 
-TARGET      可选的    远程攻击时的ip和port，FILENAME和TARGET必须指定一个 
+FILENAME    可选的    调试的binary文件路径，kernel pwn可以是ko
+TARGET      可选的    远程攻击时的ip和port，FILENAME和TARGET必须指定一个
 ```
 
 **选项**：
 
 ```
--d    可选的    flag选项，默认开启。该选项一般不需要显示指定。 
+-a    可选的    指定当前文件的架构，如arm/mips等，会传递给qemu和gdb-multiarch。
+-d    可选的    flag选项，默认开启。该选项一般不需要显示指定。
 -r    可选的    flag选项，默认关闭。可显示指定，表明此时为攻击远程。 
 -i    可选的    在remote mode下为靶机ip地址；在debug mode下为gdb的监听ip地址。 
 -p    可选的    在remote mde下为靶机端口；在debug mode下为gdb的监听端口。 
@@ -868,15 +929,146 @@ Options:
 
 其中，`cli`类型模板会使用`pwncli`的脚本模式，`lib`类型模板会使用库模式，`pwn`类型模板直接使用原始的`pwntools`来构建而不会使用`pwncli`。
 
+## initial 子命令
+
+受 [pwninit](https://github.com/io12/pwninit) 启发的题目初始化工具，在当前目录下自动完成补齐全套文件、解压、`patchelf`等一揽子工作，省去手工准备环境的麻烦。直接在题目所在目录执行即可：
+
+```shell
+pwncli initial
+```
+
+命令会扫描当前目录下的二进制与压缩包，识别架构与libc，自动解压并列出缺失的`libc.so.6`/`ld.so`，必要时调用`patchelf`完成替换。该命令目前不带额外选项，行为完全自动。
+
+## listen 子命令
+
+在本地监听一个端口，连接到达后拉起指定程序，便于本地起题或模拟远程环境。配合`debug`命令调试本地起的题目时尤为顺手。
+
+输入`pwncli listen -h`得到帮助信息：
+
+```
+Usage: pwncli listen [OPTIONS]
+
+  pwncli listen -l
+  pwncli listen -L
+  pwncli listen -l -p 10001
+  pwncli listen -l -vv -p 10001
+  pwncli listen -l -vv -p 10001 -e /bin/bash # socat tcp-l:10001,fork exec:/bin/bash
+
+  pwncli l -l
+
+Options:
+  -l, --listen-once      List once.
+  -L, --listen-forever   List forever.
+  -p, --port INTEGER     List port.
+  -t, --timeout INTEGER  List port.
+  -e, --executable TEXT  Executable file path to spawn.
+  -v, --verbose          Show more info or not.
+  -h, --help             Show this message and exit.
+```
+
+**选项**：
+
+```
+-l		可选的		flag选项，监听一次后退出。
+-L		可选的		flag选项，持续监听，每次连接到达都拉起程序。
+-p		可选的		监听端口。
+-t		可选的		超时时间。
+-e		可选的		连接到达后拉起的可执行文件路径，如/bin/bash。
+-v		可选的		flag选项，开启后显示更多日志。
+-h		查看帮助。
+```
+
+底层等价于`socat tcp-l:PORT,fork exec:EXECUTABLE`，因此`-e /bin/bash`即可得到一个交互式shell端口。
+
+## tmux 子命令
+
+利用`tmux`在多个pane/window中重复执行同一条命令，爆破、批量打靶机时免开一堆终端。命令可重复指定，按`-c ... -t N`分组。
+
+输入`pwncli tmux -h`得到帮助信息：
+
+```
+Usage: pwncli tmux [OPTIONS]
+
+  使用 tmux 执行命令。
+
+  例如：pwncli tmux -c "python3 ./exp.py re ./pwn 127.0.0.1 13337" -t 4 -p 4
+
+  在四个窗口中执行 'ls -alh'：
+      pwncli tmux -c "ls -alh" -t 4
+  执行 'ls -al' 三次，每个 pane 执行一条命令，三个 pane 合为一个 window：
+      pwncli tmux -c "ls -al" -t 3 -p 3
+      pwncli tmux -c "ls -al" -t 3 -p 1 # 每个 window 一个 pane
+  执行 'ls -al' 两次、'date' 三次，每个 pane 执行一条命令，四个 pane 合为一个 window：
+      pwncli tmux -c "ls -alh" -t 2 -c "date" -t 3 -p 4
+
+Options:
+  -c, --cmd, --command TEXT       The commands you want to execuate.
+  -t, --times INTEGER             The times of commands that you want to
+                                  repeat.
+  -p, --panes-per-window INTEGER RANGE
+                                  The number of panes in each window.
+                                  [default: 1; 1<x<=8]
+  -T, --timeout INTEGER           Close the session when timeout, -1 means no
+                                  timeout.
+  -s, --save, --save-output       Save output for panes.
+  -a, --attach, --attach-session  Attach session or not
+  -k, --kill, --kill-after-detach
+                                  Kill session after detach.
+  -v, --verbose                   Show more info or not.  [default: 0]
+  -h, --help                      Show this message and exit.
+```
+
+**选项**：
+
+```
+-c		可选的		多选的。要执行的命令，可与-t配对多次指定，实现不同命令各重复若干次。
+-t		可选的		紧随其后的-c命令重复执行的次数。
+-p		可选的		每个window中的pane数量，取值1~8，默认1。
+-T		可选的		超时后关闭session，-1表示不超时。
+-s		可选的		flag选项，保存各pane的输出。
+-a		可选的		flag选项，创建后 attach 到该 session。
+-k		可选的		flag选项，detach 后杀掉 session。
+-v		可选的		flag选项，开启后显示更多日志。
+-h		查看帮助。
+```
+
+## update 子命令
+
+执行`git pull`更新`pwncli`，省去手动进入仓库目录拉取的步骤。
+
+输入`pwncli update -h`得到帮助信息：
+
+```
+Usage: pwncli update [OPTIONS]
+
+Options:
+  -d, --dir TEXT  The directory of pwncli repository, it's used to execuate
+                  `git pull' command.
+  -v, --verbose   Show more info or not.
+  -h, --help      Show this message and exit.
+```
+
+**选项**：
+
+```
+-d		可选的		pwncli仓库目录，命令会在该目录下执行git pull。未指定时尝试自动定位。
+-v		可选的		flag选项，开启后显示更多日志。
+-h		查看帮助。
+```
+
 # 依赖库
 
 `pwncli`的依赖库清单如下所示：
 
 ```
-click   
-ropper  
-pwntools  
+click
+pwntools
+PySocks
+requests
+ropper
 ```
+
+其中`click`负责命令行框架，`pwntools`是底层的pwn攻击库，`PySocks`与`requests`用于代理连接和在线libc搜索，`ropper`提供gadget搜索后端。完整依赖以`pyproject.toml`中的`dependencies`为准。
 
 # 截图示例
 

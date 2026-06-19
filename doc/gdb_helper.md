@@ -2,7 +2,7 @@
 
 # gdb_helper — GDB 调试辅助
 
-`pwncli/utils/gdb_helper.py` 提供在 GDB 中动态定义结构体、执行命令和设置断点的底层函数。脚本模式下建议使用 `cli_misc.py` 中的 `add_struct2current_gdb_*` 封装。
+`pwncli/utils/runtime/gdb_helper.py` 提供在 GDB 中动态定义结构体、执行命令和设置断点的底层函数（均需传入 `gdb_obj`）。脚本模式下建议使用 `pwncli/utils/runtime/current_gdb.py` 中的 `add_struct2current_gdb_*` 等封装，无需手动传 `gdb_obj`。
 
 ***
 

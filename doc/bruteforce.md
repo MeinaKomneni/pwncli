@@ -2,7 +2,7 @@
 
 # bruteforce — 哈希爆破
 
-`pwncli/utils/bruteforce.py` 用于 CTF 中常见的 PoW (Proof of Work) 验证。
+`pwncli/utils/toolkit/bruteforce.py` 用于 CTF 中常见的 PoW (Proof of Work) 验证。
 
 ***
 

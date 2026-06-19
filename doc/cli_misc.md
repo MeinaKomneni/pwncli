@@ -2,7 +2,7 @@
 
 # cli_misc — 脚本模式工具集
 
-`pwncli/utils/cli_misc.py` 提供围绕 `gift` 全局状态的脚本模式工具：IO 快捷方式、地址管理、GDB 操作、CurrentGadgets 等。
+脚本模式下围绕 `gift` 全局状态的工具集，统一位于 `pwncli/utils/runtime/` 子包：IO 收发与地址管理在 `current_session.py`，GDB 交互在 `current_gdb.py`（当前会话封装）与 `gdb_helper.py`（底层 `gdb_obj` 操作），gadget 链构建在 `current_gadgets.py`，脚本模式装饰器在 `cli_decorates.py`。
 
 ***
 

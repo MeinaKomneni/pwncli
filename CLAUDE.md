@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+read doc/* to learn this project more!
+
 ## What is pwncli
 
 pwncli is a CTF PWN exploitation toolkit built on click and pwntools. It has three usage modes:

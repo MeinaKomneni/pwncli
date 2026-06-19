@@ -2,7 +2,7 @@
 
 # gadgetbox — Gadget 搜索系统
 
-`pwncli/utils/gadgetbox.py` 提供三种 gadget 搜索后端，`cli_misc.py` 中的 `CurrentGadgets` 提供脚本模式的高级接口和 ROP 链构建器。
+`pwncli/utils/toolkit/gadgetbox.py` 提供三种 gadget 搜索后端，`pwncli/utils/runtime/current_gadgets.py` 中的 `CurrentGadgets` 提供脚本模式的高级接口和 ROP 链构建器。
 
 ***
 

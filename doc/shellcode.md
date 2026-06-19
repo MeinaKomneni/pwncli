@@ -2,7 +2,7 @@
 
 # shellcode — Shellcode 商店
 
-`pwncli/utils/shellcode.py` 提供预编译的常用 shellcode。
+`pwncli/utils/toolkit/shellcode.py` 提供预编译的常用 shellcode。
 
 ***
 

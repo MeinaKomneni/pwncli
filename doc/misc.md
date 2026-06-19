@@ -2,7 +2,7 @@
 
 # misc — 基础工具集
 
-`pwncli/utils/misc.py` 提供全局状态总线、打包解包增强、地址接收、日志、tcache 计算、safe linking 等基础工具。
+基础工具集，分散在 `pwncli/utils/core/` 与 `pwncli/utils/toolkit/` 两个子包：全局状态总线 `gift` 在 `core/state.py`，打包解包在 `core/packing.py`，日志在 `core/log.py`，编码解码在 `core/encoding.py`，CDLL/超时在 `core/env.py`；地址接收与 `/proc/pid/maps` 在 `toolkit/recv.py`，tcache 计算与 safe linking 在 `toolkit/heapcalc.py`，one_gadget 在 `toolkit/onegadget.py`。
 
 ***
 

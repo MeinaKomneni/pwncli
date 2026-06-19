@@ -2,6 +2,8 @@
 
 # consts — 常用 C/Linux 宏常量与系统调用号
 
+`pwncli/utils/core/consts.py` 中的 `Consts` 类收录打 ROP/SROP 时常用的 C/Linux 宏常量与系统调用号，离线比赛时随手可查。
+
 ***
 
 ## 快速使用
@@ -213,4 +215,4 @@ Consts.syscall.i386.OPENAT      # 295
 | EXECVEAT | 322 | 358 |
 | SECCOMP | 317 | 354 |
 
-完整的调用号定义见 `pwncli/utils/consts.py` 的 `Consts.syscall` 内嵌类。
+完整的调用号定义见 `pwncli/utils/core/consts.py` 的 `Consts.syscall` 内嵌类。

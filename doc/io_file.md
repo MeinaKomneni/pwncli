@@ -2,7 +2,7 @@
 
 # IO_FILE 利用工具
 
-pwncli 提供了 `IO_FILE_plus_struct` 类和 `payload_replace` 函数，用于构造伪造的 `_IO_FILE_plus` 结构体，快速生成各种 IO_FILE 利用的 payload。
+`pwncli/utils/toolkit/io_file.py` 提供了 `IO_FILE_plus_struct` 类和 `payload_replace` 函数，用于构造伪造的 `_IO_FILE_plus` 结构体，快速生成各种 IO_FILE 利用的 payload。
 
 ```python
 from pwncli import *

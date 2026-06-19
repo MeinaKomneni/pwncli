@@ -2,7 +2,9 @@
 
 # decorates — 装饰器
 
-`pwncli/utils/decorates.py` 和 `pwncli/utils/cli_decorates.py` 提供各类实用装饰器。
+装饰器分布在三个子包：通用装饰器（控制流、计时、缓存等）在 `pwncli/utils/core/decorates.py`，枚举攻击装饰器 `local_enumerate_attack`/`remote_enumerate_attack` 在 `pwncli/utils/toolkit/enumerate_attack.py`，脚本模式的 `smart_enumerate_attack` 在 `pwncli/utils/runtime/cli_decorates.py`。
+
+> 注意：`local_enumerate_attack` 与 `remote_enumerate_attack` 未计入 `__all__`，`from pwncli import *` 不会导入它们，需显式引入：`from pwncli.utils.toolkit.enumerate_attack import local_enumerate_attack, remote_enumerate_attack`。
 
 ***
 

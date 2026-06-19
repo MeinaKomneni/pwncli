@@ -2,7 +2,7 @@
 
 # pipes — 命名管道通信
 
-`pwncli/utils/pipes.py` 提供 FIFO 管道的 pwntools 风格 API，用于进程间通信。
+`pwncli/utils/toolkit/pipes.py` 提供 FIFO 管道的 pwntools 风格 API，用于进程间通信。
 
 ***
 

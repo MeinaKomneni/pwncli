@@ -2,7 +2,7 @@
 
 # libcbox — 在线 Libc 搜索
 
-`pwncli/utils/libcbox.py` 通过 [libc.rip](https://libc.rip) API 根据泄露的符号地址搜索 libc 版本。
+`pwncli/utils/toolkit/libcbox.py` 通过 [libc.rip](https://libc.rip) API 根据泄露的符号地址搜索 libc 版本。
 
 ***
 
