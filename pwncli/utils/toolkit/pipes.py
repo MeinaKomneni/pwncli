@@ -5,7 +5,7 @@ from stat import S_ISFIFO
 import click
 from pwn import hexdump
 
-from .decorates import bomber
+from ..core.decorates import bomber
 
 __all__ = ["NamedPipePair"]
 

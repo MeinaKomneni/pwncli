@@ -20,7 +20,7 @@ from pwn import wget, which
 
 from pwncli.cli import pass_environ
 
-from ..utils.toolkit.decorates import limit_calls
+from ..utils.core.decorates import limit_calls
 from ..utils.toolkit.onegadget import one_gadget
 
 

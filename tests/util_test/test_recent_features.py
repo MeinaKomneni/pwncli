@@ -18,7 +18,7 @@ from pwncli.utils.runtime.current_gdb import (
     gdb_top_chunk_addr,
 )
 from pwncli.utils.core.consts import Consts
-from pwncli.utils.toolkit.decorates import (
+from pwncli.utils.core.decorates import (
     cache_nonresult,
     cache_result,
     convert_bytes2str,

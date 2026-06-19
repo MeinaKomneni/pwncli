@@ -15,7 +15,7 @@ from subprocess import check_output
 
 from pwnlib.atexit import register
 
-from ..toolkit.decorates import always_success, cache_nonresult, limit_calls
+from ..core.decorates import always_success, cache_nonresult, limit_calls
 from ..core.env import _in_tmux
 
 __all__ = [

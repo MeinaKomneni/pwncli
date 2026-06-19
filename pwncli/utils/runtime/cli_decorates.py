@@ -15,7 +15,7 @@ from typing import List
 from pwn import context
 from .current_session import (copy_current_io, get_current_codebase_addr,
                               get_current_libcbase_addr)
-from ..toolkit.decorates import _check_func_args
+from ..toolkit.enumerate_attack import _check_func_args
 from ..core.exceptions import PwncliExit
 from ..core.state import gift
 from ..core.log import errlog_exit, log_ex
