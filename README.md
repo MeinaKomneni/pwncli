@@ -12,9 +12,9 @@
   - [config 子命令](#config-子命令)
     - [list 二级子命令](#list-二级子命令)
     - [set 二级子命令](#set-二级子命令)
-  - [misc 子命令](#misc-子命令)
-    - [gadget 二级子命令](#gadget-二级子命令)
-    - [setgdb 二级子命令](#setgdb-二级子命令)
+  - [gadget 子命令](#gadget-子命令)
+  - [setgdb 子命令](#setgdb-子命令)
+  - [dstruct 子命令](#dstruct-子命令)
   - [patchelf 子命令](#patchelf-子命令)
   - [qemu 子命令](#qemu-子命令)
   - [template 子命令](#template-子命令)
@@ -24,7 +24,7 @@
     - [debug 示例](#debug-示例)
     - [remote 示例](#remote-示例)
     - [config 示例](#config-示例)
-    - [misc 示例](#misc-示例)
+    - [setgdb 示例](#setgdb-示例)
     - [patchelf 示例](#patchelf-示例)
     - [qemu 示例](#qemu-示例)
 
@@ -66,14 +66,14 @@ pwncli
         list
         set
     debug
-    misc
-        gadget
-        setgdb
+    dstruct
+    gadget
+    setgdb
     patchelf
     qemu
     remote
 ```
-其中，`pwncli`为主命令，`config/debug/misc/patchelf/qemu/remote`为一级子命令，`list/set`为隶属`config`的二级子命令，`gadget/setgdb`为隶属`misc`的二级子命令。
+其中，`pwncli`为主命令，`config/debug/dstruct/gadget/patchelf/qemu/remote/setgdb`等为一级子命令，`list/set`为隶属`config`的二级子命令。
 
 `pwncli`支持命令的前缀匹配(与`gdb`的命令前缀匹配类似)，通常只需要给出命令的前缀即可成功调用该命令。即输入`pwncli debug ./pwn`、`pwncli de ./pwn`和`pwncli d ./pwn`的执行效果是完全一样的。但是，必须保证前缀不会匹配到两个或多个子命令，否则将会抛出`MatchError`的匹配错误。 
 
@@ -381,7 +381,10 @@ Options:
 Commands:
   config    Get or set something about config data.
   debug     Debug the pwn file locally.
-  misc      Misc of useful sub-commands.
+  dstruct   Display struct info by gdb.
+  gadget    Get all gadgets using ropper and ROPgadget, and then store them
+            in files.
+  setgdb    Copy gdbinit files from and set gdb-scripts for current user.
   patchelf  Patchelf executable file using glibc-all-in-one.
   qemu      Use qemu to debug pwn, for kernel pwn or arm/mips arch.
   remote    Pwn remote host.
@@ -402,7 +405,9 @@ Commands:
 ```
 config     操作pwncli配置文件，配置文件路径为~/./pwncli.conf。
 debug      最常用的子命令，用于本地调试pwn题。
-misc       杂项命令，收录了一些实用的子命令。
+dstruct    通过gdb提取并展示二进制文件中的结构体信息。
+gadget     使用ropper和ROPgadget工具获取所有的gadgets，并将其存储在本地。
+setgdb     将pwncli/conf/.gdbinit-xxx的配置文件拷贝到家目录。
 patchelf   快速地执行patchelf，以用于调试不同版本的glibc。
 qemu       使用qemu调试pwn题，用于kernel pwn或其他架构的pwn。
 remote     最常用的子命令，用于远程攻击靶机。
@@ -625,43 +630,14 @@ CLAUSE	必须的		设置的语句，格式为key=value。
 -h         		  查看帮助。
 ```
 
-## misc 子命令
+## gadget 子命令
 
-`misc`子命令是一个杂项命令合集，即其会包含许多二级子命令，每个二级子命令的功能都不一样。
+使用ropper和ROPgadget工具获取所有的gadgets，并将其存储在本地。
 
-输入`pwncli misc -h`得到帮助信息：
-
-```
-Usage: pwncli misc [OPTIONS] COMMAND [ARGS]...
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  gadget  Get all gadgets using ropper and ROPgadget, and then store them in
-          files.
-  setgdb  Copy gdbinit files from and set gdb-scripts for current user.
-```
-
-**选项**：
+输出`pwncli gadget -h`得到帮助信息：
 
 ```
--h		查看帮助。
-```
-
-**命令**：
-
-```
-gadget		使用ropper和ROPgadget工具获取所有的gadgets，并将其存储在本地。
-setgdb		将pwncli/conf/.gdbinit-xxx的配置文件拷贝到家目录。使用该命令的前提是将gef、peda、pwndbg、Pwbgdb插件下载到家目录。
-```
-
-### gadget 二级子命令
-
-输出`pwncli misc gadget -h`得到帮助信息：
-
-```
-Usage: pwncli misc gadget [OPTIONS] [FILENAME]
+Usage: pwncli gadget [OPTIONS] [FILENAME]
 
 Options:
   -a, --all, --all-gadgets     Get all gadgets and don't remove duplicates.
@@ -684,16 +660,18 @@ FILENAME	必须的		要获取gadgets的binary路径。
 -h		查看帮助。
 ```
 
-### setgdb 二级子命令
+## setgdb 子命令
 
-输出`pwncli misc setgdb -h`得到帮助信息：
+将pwncli/conf/.gdbinit-xxx的配置文件拷贝到家目录。使用该命令的前提是将gef、peda、pwndbg、Pwbgdb插件下载到家目录。
+
+输入`pwncli setgdb -h`得到帮助信息：
 
 ```
-Usage: pwncli misc setgdb [OPTIONS]
+Usage: pwncli setgdb [OPTIONS]
 
 Options:
   -g, --generate-script  Generate the scripts of gdb-gef/gdb-pwndbg/gdb-peda
-                         in /usr/local/bin or not.  [default: False]
+                         in /bin or $HOME/.local/bin or not.
   --yes                  Confirm the action without prompting.
   -h, --help             Show this message and exit.
 ```
@@ -701,7 +679,7 @@ Options:
 **选项**：
 
 ```
--g		可选的		flag选项，默认关闭。开启后将在/usr/local/bin下生成三个shell脚本,gdb-gef、gdb-peda、gdb-pwndbg。该选项需要在sudo下使用。
+-g		可选的		flag选项，默认关闭。开启后将在/bin或$HOME/.local/bin下生成三个shell脚本,gdb-gef、gdb-peda、gdb-pwndbg。该选项需要在sudo下使用。
 --yes	确认项		输入y后该命令生效。
 -h		查看帮助。
 ```
@@ -712,6 +690,37 @@ Options:
 #!/bin/sh
 cp ~/.gdbinit-pwndbg ~/.gdbinit
 exec gdb "$@"
+```
+
+## dstruct 子命令
+
+通过gdb提取并展示二进制文件中的结构体信息。
+
+输入`pwncli dstruct -h`得到帮助信息：
+
+```
+Usage: pwncli dstruct [OPTIONS] [FILENAME]
+
+Options:
+  -s, --save-all               Save all struct info or not.
+  -d, --dir, --directory PATH  The directory to save files.
+  -n, --name TEXT              The name of struct you want to show.
+  -h, --help                   Show this message and exit.
+```
+
+**参数**：
+
+```
+FILENAME	可选的		要提取结构体信息的binary路径。
+```
+
+**选项**：
+
+```
+-s		可选的		flag选项，默认关闭。开启后将把全部结构体信息保存到文件。
+-d		可选的		保存文件的目录。若未指定则为当前目录。
+-n		可选的		可多次指定，指定要展示的结构体名。未指定时交互确认后展示全部。
+-h		查看帮助。
 ```
 
 ## patchelf 子命令
@@ -963,15 +972,15 @@ pwntools
 
 ![image-20220226235423624](https://github.com/RoderickChan/pwncli/blob/main/img/image-20220226235423624.png)
 
-### misc 示例
+### setgdb 示例
 
-`pwncli misc gadget ./test`：
+`pwncli gadget ./test`：
 
 ![image-20220226235602674](https://github.com/RoderickChan/pwncli/blob/main/img/image-20220226235602674.png)
 
 
 
-`sudo pwncli misc setgdb -g`：
+`sudo pwncli setgdb -g`：
 
 ![image-20220226235738869](https://github.com/RoderickChan/pwncli/blob/main/img/image-20220226235738869.png)
 

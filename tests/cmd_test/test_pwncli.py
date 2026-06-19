@@ -18,7 +18,8 @@ def test_allcmd():
         ["initial"],
         ["gadget"],
         ["listen"],
-        ["misc", "setgdb", "dstruct"],
+        ["setgdb"],
+        ["dstruct"],
         ["qemu"],
         ["template"],
         ["patchelf"]
