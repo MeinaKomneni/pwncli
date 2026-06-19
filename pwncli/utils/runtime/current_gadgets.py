@@ -101,7 +101,7 @@ class CurrentGadgets:
                 CurrentGadgets.__arch = libc.arch
                 if CurrentGadgets.__internal_gadgetbox.box_name == "ropper":
                     CurrentGadgets.__internal_gadgetbox.add_file(
-                        "libc", libc.path, __arch_mapping[elf.arch])
+                        "libc", libc.path, __arch_mapping[libc.arch])
                 else:
                     CurrentGadgets.__internal_gadgetbox.add_file(
                         "libc", libc.path, libc.arch)
