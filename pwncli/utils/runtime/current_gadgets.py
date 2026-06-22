@@ -20,6 +20,9 @@ __all__ = [
     "CG",
 ]
 
+# _search 的哨兵：elf 与 libc 都未试探
+_NEITHER = object()
+
 
 class CurrentGadgets:
     __internal_gadgetbox = None
@@ -68,48 +71,33 @@ class CurrentGadgets:
             CurrentGadgets._mutex.release()
             return False
 
-        try:
-            CurrentGadgets.__internal_gadgetbox = RopgadgetBox()
-        except:
+        # 按优先级试探可用 backend：ROPgadget CLI → pwntools ELF → ropper
+        # 首个构造不抛异常者胜出；ElfGadgetBox 通常可用，RopperBox 作为兜底
+        for _cls in (RopgadgetBox, ElfGadgetBox, RopperBox):
             try:
-                CurrentGadgets.__internal_gadgetbox = ElfGadgetBox()
-            except:
-                CurrentGadgets.__internal_gadgetbox = RopperBox()
+                CurrentGadgets.__internal_gadgetbox = _cls()
+                break
+            except Exception:
+                continue
+
+        def _add_one(name, obj):
+            """把 elf/libc 装入 gadgetbox，返回是否成功。"""
+            if obj.arch not in __arch_mapping:
+                log2_ex("Unsupported arch, only for i386 and amd64.")
+                return False
+            CurrentGadgets.__arch = obj.arch
+            box = CurrentGadgets.__internal_gadgetbox
+            arch_arg = __arch_mapping[obj.arch] if box.box_name == "ropper" else obj.arch
+            box.add_file(name, obj.path, arch_arg)
+            if obj.pie:
+                box.set_imagebase(name, obj.address)
+            return True
 
         res = False
         if elf:
-            if elf.arch not in __arch_mapping:
-                log2_ex("Unsupported arch, only for i386 and amd64.")
-            else:
-                CurrentGadgets.__arch = elf.arch
-
-                if CurrentGadgets.__internal_gadgetbox.box_name == "ropper":
-                    CurrentGadgets.__internal_gadgetbox.add_file(
-                        "elf", elf.path, __arch_mapping[elf.arch])
-                else:
-                    CurrentGadgets.__internal_gadgetbox.add_file(
-                        "elf", elf.path, elf.arch)
-
-                if CurrentGadgets.__elf.pie:
-                    CurrentGadgets.__internal_gadgetbox.set_imagebase(
-                        "elf", CurrentGadgets.__elf.address)
-                res = True
+            res = _add_one("elf", elf) or res
         if libc:
-            if libc.arch not in __arch_mapping:
-                log2_ex("Unsupported arch, only for i386 and amd64..")
-            else:
-                CurrentGadgets.__arch = libc.arch
-                if CurrentGadgets.__internal_gadgetbox.box_name == "ropper":
-                    CurrentGadgets.__internal_gadgetbox.add_file(
-                        "libc", libc.path, __arch_mapping[libc.arch])
-                else:
-                    CurrentGadgets.__internal_gadgetbox.add_file(
-                        "libc", libc.path, libc.arch)
-
-                if CurrentGadgets.__libc.pie:
-                    CurrentGadgets.__internal_gadgetbox.set_imagebase(
-                        "libc", CurrentGadgets.__libc.address)
-                res = True
+            res = _add_one("libc", libc) or res
 
         CurrentGadgets.__loaded = res
         CurrentGadgets._mutex.release()
@@ -138,34 +126,40 @@ class CurrentGadgets:
                 assert CurrentGadgets.__libc.address != 0, "Please set libc's base address before find gadget."
 
     @staticmethod
+    def _search(make_call):
+        """按 elf→libc 顺序试探 gadget 搜索；命中即返回，两者都未试返回 _NEITHER。"""
+        box = CurrentGadgets.__internal_gadgetbox
+        elf, libc = CurrentGadgets.__elf, CurrentGadgets.__libc
+        use_elf = CurrentGadgets.__find_in_elf or (
+            CurrentGadgets.__find_in_elf is None and (elf.address or elf.statically_linked))
+        if use_elf:
+            if elf.pie:
+                box.set_imagebase("elf", elf.address)
+            try:
+                return make_call('elf')
+            except Exception:
+                pass
+        use_libc = CurrentGadgets.__find_in_libc or (
+            CurrentGadgets.__find_in_libc is None and libc.address)
+        if use_libc:
+            if libc.pie:
+                box.set_imagebase("libc", libc.address)
+            return make_call('libc')
+        return _NEITHER
+
+    @staticmethod
     def _internal_find(func_name):
         if not CurrentGadgets._initial_gadgetbox():
             return 0
-
         CurrentGadgets.__check_before_find()
-
         func = getattr(CurrentGadgets.__internal_gadgetbox, func_name)
-        if CurrentGadgets.__find_in_elf or (CurrentGadgets.__find_in_elf is None and (CurrentGadgets.__elf.address or CurrentGadgets.__elf.statically_linked)):
-            if CurrentGadgets.__elf.pie:
-                CurrentGadgets.__internal_gadgetbox.set_imagebase(
-                    "elf", CurrentGadgets.__elf.address)
-            try:
-                res = func('elf')
-                return res
-            except:
-                pass
-
-        if CurrentGadgets.__find_in_libc or (CurrentGadgets.__find_in_libc is None and CurrentGadgets.__libc.address):
-            if CurrentGadgets.__libc.pie:
-                CurrentGadgets.__internal_gadgetbox.set_imagebase(
-                    "libc", CurrentGadgets.__libc.address)
-            res = func('libc')
-            return res
-
-        if not CurrentGadgets.__find_in_elf and not CurrentGadgets.__find_in_libc:
-            log2_ex(
-                "Have closed both elf finder and libc finder, please call 'CurrentGadgets.set_find_area' to set a finder.")
-        raise RuntimeError("Cannot find gadget using '{}'.".format(func_name))
+        res = CurrentGadgets._search(lambda name: func(name))
+        if res is _NEITHER:
+            if not CurrentGadgets.__find_in_elf and not CurrentGadgets.__find_in_libc:
+                log2_ex(
+                    "Have closed both elf finder and libc finder, please call 'CurrentGadgets.set_find_area' to set a finder.")
+            raise RuntimeError("Cannot find gadget using '{}'.".format(func_name))
+        return res
 
     @staticmethod
     @functools.lru_cache(maxsize=128, typed=True)
@@ -177,36 +171,19 @@ class CurrentGadgets:
         find = find_str
         if find_type == "asm":
             find = asm(find).hex()
-            func = getattr(CurrentGadgets.__internal_gadgetbox,
-                           "search_opcode")
+            func = getattr(CurrentGadgets.__internal_gadgetbox, "search_opcode")
         elif find_type == "opcode":
-            func = getattr(CurrentGadgets.__internal_gadgetbox,
-                           "search_opcode")
+            func = getattr(CurrentGadgets.__internal_gadgetbox, "search_opcode")
         elif find_type == "string":
-            func = getattr(CurrentGadgets.__internal_gadgetbox,
-                           "search_string")
+            func = getattr(CurrentGadgets.__internal_gadgetbox, "search_string")
         else:
             errlog_exit("Unsupported find_type, only: asm / opcode / string.")
-
-        res = None
-        if CurrentGadgets.__find_in_elf or (CurrentGadgets.__find_in_elf is None and (CurrentGadgets.__elf.address or CurrentGadgets.__elf.statically_linked)):
-            if CurrentGadgets.__elf.pie:
-                CurrentGadgets.__internal_gadgetbox.set_imagebase(
-                    "elf", CurrentGadgets.__elf.address)
-            try:
-                return func(find, 'elf', get_list)
-            except:
-                pass
-
-        if CurrentGadgets.__find_in_libc or (CurrentGadgets.__find_in_libc is None and CurrentGadgets.__libc.address):
-            if CurrentGadgets.__libc.pie:
-                CurrentGadgets.__internal_gadgetbox.set_imagebase(
-                    "libc", CurrentGadgets.__libc.address)
-            return func(find, 'libc', get_list)
-
-        if not CurrentGadgets.__find_in_elf and not CurrentGadgets.__find_in_libc:
-            errlog_exit("Have closed both elf finder and libc finder.")
-        raise RuntimeError("Cannot find gadget: {}.".format(find_str))
+        res = CurrentGadgets._search(lambda name: func(find, name, get_list))
+        if res is _NEITHER:
+            if not CurrentGadgets.__find_in_elf and not CurrentGadgets.__find_in_libc:
+                errlog_exit("Have closed both elf finder and libc finder.")
+            raise RuntimeError("Cannot find gadget: {}.".format(find_str))
+        return res
 
     @staticmethod
     def syscall() -> int:
@@ -297,29 +274,21 @@ class CurrentGadgets:
     @staticmethod
     def pop_pop_ret() -> int:
         """pop xxx; pop xxx; ret"""
-        try:
-            return CurrentGadgets.find_gadget('5b5dc3', 'opcode')
-        except:
-            pass
-        try:
-            return CurrentGadgets.find_gadget('5f5dc3', 'opcode')
-        except:
-            pass
-
+        for op in ('5b5dc3', '5f5dc3'):
+            try:
+                return CurrentGadgets.find_gadget(op, 'opcode')
+            except Exception:
+                pass
         return CurrentGadgets.find_gadget('415e415fc3', 'opcode')
 
     @staticmethod
     def pop_pop_pop_ret() -> int:
         """pop xxx; pop xxx; pop xxx; ret"""
-        try:
-            return CurrentGadgets.find_gadget('585b5dc3', 'opcode')
-        except:
-            pass
-        try:
-            return CurrentGadgets.find_gadget('585A5BC3', 'opcode')
-        except:
-            pass
-
+        for op in ('585b5dc3', '585A5BC3'):
+            try:
+                return CurrentGadgets.find_gadget(op, 'opcode')
+            except Exception:
+                pass
         return CurrentGadgets.find_gadget('415d415e415fc3', 'opcode')
 
     @staticmethod
@@ -527,7 +496,7 @@ class CurrentGadgets:
         ]
         try:
             return flat(layout)
-        except:
+        except Exception:
             pass
         # mov qword ptr [rax], rdx; ret;
         layout = [
@@ -568,76 +537,57 @@ class CurrentGadgets:
 
     @staticmethod
     def __try_get_rdx_gadget(rdx_val, rbx_val=0) -> list:
-        try:
-            return [CurrentGadgets.pop_rdx_ret(), rdx_val]
-        except:
-            pass
-        try:
-            return [CurrentGadgets.pop_rdx_rbx_ret(), rdx_val, rbx_val]
-        except:
-            pass
-        try:
-            return [CurrentGadgets.pop_rdx_xor_eax_ret(), rdx_val]
-        except:
-            pass
+        for make in (
+            lambda: [CurrentGadgets.pop_rdx_ret(), rdx_val],
+            lambda: [CurrentGadgets.pop_rdx_rbx_ret(), rdx_val, rbx_val],
+            lambda: [CurrentGadgets.pop_rdx_xor_eax_ret(), rdx_val],
+        ):
+            try:
+                return make()
+            except Exception:
+                continue
         return [CurrentGadgets.pop_rdx_xor_eax_pop4_ret(), rdx_val, 0, 0, 0, 0]
 
     @staticmethod
     def __try_get_rcx_gadget(rcx_val, rbx_val=0) -> list:
         try:
             return [CurrentGadgets.pop_rcx_ret(), rcx_val]
-        except:
+        except Exception:
             return [CurrentGadgets.pop_rcx_rbx_ret(), rcx_val, rbx_val]
 
     @staticmethod
     def __try_get_rsi_gadget(rsi_val, r15_val=0) -> list:
         try:
             return [CurrentGadgets.pop_rsi_ret(), rsi_val]
-        except:
+        except Exception:
             return [CurrentGadgets.pop_rsi_r15_ret(), rsi_val, r15_val]
 
     @staticmethod
     def __inner_chain(i386_num, syscall_num, para1, para2=None, para3=None) -> bytes:
         if not CurrentGadgets._initial_gadgetbox():
             return None
-        if CurrentGadgets.__arch == "i386":
-            if para1 < 0:
-                para1 += 1 << 32
-            layout = [
-                CurrentGadgets.pop_rbx_ret(),
-                para1
-            ]
-            if para2 is not None:
-                layout.append(CurrentGadgets.__try_get_rcx_gadget(para2))
-
-            if para3 is not None:
-                layout.append(
-                    CurrentGadgets.__try_get_rdx_gadget(para3, para1))
-
-            layout.append(CurrentGadgets.pop_rax_ret())
-            layout.append(i386_num)
-            layout.append(CurrentGadgets.syscall_ret())
-            return flat(layout)
-
-        elif CurrentGadgets.__arch == "amd64":
-            if para1 < 0:
-                para1 += 1 << 64
-            layout = [
-                CurrentGadgets.pop_rdi_ret(),
-                para1
-            ]
-            if para2 is not None:
-                layout.append(CurrentGadgets.__try_get_rsi_gadget(para2))
-
-            if para3 is not None:
-                layout.append(CurrentGadgets.__try_get_rdx_gadget(para3))
-
-            layout.append(CurrentGadgets.pop_rax_ret())
-            layout.append(syscall_num)
-            layout.append(CurrentGadgets.syscall_ret())
-            return flat(layout)
+        arch = CurrentGadgets.__arch
+        if arch == "i386":
+            width, num = 1 << 32, i386_num
+            pop_arg1 = CurrentGadgets.pop_rbx_ret
+            arg2 = lambda v: CurrentGadgets.__try_get_rcx_gadget(v)
+            arg3 = lambda v: CurrentGadgets.__try_get_rdx_gadget(v, para1)
+        elif arch == "amd64":
+            width, num = 1 << 64, syscall_num
+            pop_arg1 = CurrentGadgets.pop_rdi_ret
+            arg2 = lambda v: CurrentGadgets.__try_get_rsi_gadget(v)
+            arg3 = lambda v: CurrentGadgets.__try_get_rdx_gadget(v)
         else:
-            errlog_exit("Unsupported arch: {}".format(CurrentGadgets.__arch))
+            errlog_exit("Unsupported arch: {}".format(arch))
+        if para1 < 0:
+            para1 += width
+        layout = [pop_arg1(), para1]
+        if para2 is not None:
+            layout.append(arg2(para2))
+        if para3 is not None:
+            layout.append(arg3(para3))
+        layout += [CurrentGadgets.pop_rax_ret(), num, CurrentGadgets.syscall_ret()]
+        return flat(layout)
 
     @staticmethod
     def syscall_chain(syscall_num, para1, para2=None, para3=None) -> bytes:
@@ -685,27 +635,17 @@ class CurrentGadgets:
     def write_by_magic(write_addr: int, ori: int, expected: int, short=True) -> bytes:
         if not CurrentGadgets._initial_gadgetbox():
             return None
-        if CurrentGadgets.__arch == "amd64":
-            if short:
-                return flat([
-                    CurrentGadgets.find_gadget(
-                        "5b5d415c415d415e415fc3", 'opcode'),
-                    expected - ori if expected > ori else expected - ori + 0x100000000,
-                    write_addr+0x3d, 0, 0, 0, 0,
-                    CurrentGadgets.magic_gadget()
-                ])
-            else:
-                return flat([
-                    CurrentGadgets.find_gadget(
-                        "4883c4085b5d415c415d415e415fc3", 'opcode'),
-                    0,
-                    expected - ori if expected > ori else expected - ori + 0x100000000,
-                    write_addr+0x3d, 0, 0, 0, 0,
-                    CurrentGadgets.magic_gadget()
-                ])
-
-        else:
+        if CurrentGadgets.__arch != "amd64":
             errlog_exit("Only used for amd64!")
+        delta = expected - ori
+        if delta <= 0:
+            delta += 0x100000000
+        gadget = "5b5d415c415d415e415fc3" if short else "4883c4085b5d415c415d415e415fc3"
+        layout = [CurrentGadgets.find_gadget(gadget, 'opcode')]
+        if not short:
+            layout.append(0)
+        layout += [delta, write_addr + 0x3d, 0, 0, 0, 0, CurrentGadgets.magic_gadget()]
+        return flat(layout)
 
     @staticmethod
     def ret2csu(edi: int, rsi: int, rdx: int, call_array_addr: int,
@@ -739,16 +679,18 @@ class CurrentGadgets:
 
         for reg in ['r12', 'r13', 'r14', 'r15']:
             for x in dis_res:
-                if reg in x:
-                    if 'mov' in x:
-                        if 'di' in x:
-                            layout.append(edi)
-                        elif 'si' in x:
-                            layout.append(rsi)
-                        elif 'dx' in x:
-                            layout.append(rdx)
-                    else:
-                        layout.append(call_array_addr)
+                if reg not in x:
+                    continue
+                if 'mov' not in x:
+                    layout.append(call_array_addr)
+                    break
+                if 'di' in x:
+                    layout.append(edi)
+                elif 'si' in x:
+                    layout.append(rsi)
+                elif 'dx' in x:
+                    layout.append(rdx)
+                break
 
         newlen = len(layout)
         assert newlen - oldlen == 4, "You need build csu ropchain manually."
